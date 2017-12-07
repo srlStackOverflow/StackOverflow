@@ -26,6 +26,7 @@ public class StackOverflow {
 		rows=CsvFileReader.readCsvFile(fileName);
 
 		rowsProcessed=CodeParser.convertToSource(rows);
+		System.out.println(rowsProcessed.size());
 		
 
 
