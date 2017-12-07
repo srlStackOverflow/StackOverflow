@@ -22,12 +22,13 @@ public class CodeParser {
 
 		//	if (i==9) break;
 			System.out.println();
-			System.out.print("Answer number = "+i +"   Answer score= "+rows.get(i).answerScore);
+			System.out.print("Answer number = "+i +"   Answer score= "+row.answerScore);
 			System.out.println("  number of code fragments: "+codeElements.size()); 
 			System.out.println("========================================================================================");
 
 			for( int c=0; c<codeElements.size();c++) {
-				System.out.println("-------------------------------Code fragment number"+c+1+"---------------------------------");
+				int f=c+1;
+				System.out.println("-------------------------------Code fragment number "+f +"---------------------------------");
 				System.out.println(codeElements.get(c).text());
 
 			}

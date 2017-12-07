@@ -23,8 +23,8 @@ public class StackOverflow {
 	
 
 		String fileName= "java Answers.csv";
-		
 		rows=CsvFileReader.readCsvFile(fileName);
+
 		rowsProcessed=CodeParser.convertToSource(rows);
 		
 
