@@ -38,5 +38,10 @@ public class Row {
 		return answersBody;
 		
 	}
+	public  void setAnswerBody(String body) {
+		answersBody=body;
+		
+	}
+	
 
 }

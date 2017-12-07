@@ -12,7 +12,7 @@ public class StackOverflow {
 	//List of All csv and excel files in the folder
 	public static ArrayList<String> files= new ArrayList<String>(); 
 	
-	public static ArrayList<Row> rows = new ArrayList<Row>();
+	public static ArrayList<Row> rowsFromCsvFile = new ArrayList<Row>();
 	public static ArrayList<Row> rowsProcessed = new ArrayList<Row>();
 
 	
@@ -23,10 +23,19 @@ public class StackOverflow {
 	
 
 		String fileName= "java Answers.csv";
-		rows=CsvFileReader.readCsvFile(fileName);
+		rowsFromCsvFile=CsvFileReader.readCsvFile(fileName);
 
-		rowsProcessed=CodeParser.convertToSource(rows);
+		rowsProcessed=CodeParser.convertToSource(rowsFromCsvFile);
+		
 		System.out.println(rowsProcessed.size());
+		
+		int i=0;
+		for (Row row:rowsProcessed) {
+			System.out.println(row.answerId+"  "+ row.questionId+"  \n"+ row.getAnswerBody());
+			System.out.println("---------------------------------------------------------------------------------------------------------------------------------------");
+			i++;
+			if (i>10) break;
+		}
 		
 
 
