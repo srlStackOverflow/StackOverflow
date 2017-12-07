@@ -8,7 +8,6 @@ import java.util.List;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
-
 /**
  * @author Farouq
  *
@@ -16,17 +15,23 @@ import org.apache.commons.csv.CSVRecord;
 public class CsvFileReader {
 	
 	//CSV file header
-    private static final String [] FILE_HEADER_MAPPING = {"id","firstName","lastName","gender","age"};
+    private static final String [] FILE_HEADER_MAPPING = {"Answeres", "Score", "Post Link", "Question Tags", "Body", "AnswerCount", "Id"};
 	
 	//Student attributes
-	private static final String STUDENT_ID = "id";
-	private static final String STUDENT_FNAME = "firstName";
-	private static final String STUDENT_LNAME = "lastName";
-	private static final String STUDENT_GENDER = "gender"; 
-	private static final String STUDENT_AGE = "age";
+	private static final String answer = "Answeres";
+	private static final String score = "Score";
+	private static final String answer_Id = "Post Link";
+	private static final String question_Tags = "Question Tags"; 
+	private static final String Question_Body = "Body";
+	private static final String answer_Count = "AnswerCount"; 
+	private static final String question_Id = "Id";
 	
-	public static void readCsvFile(String fileName) {
+	// Read csv file and return its contenet in an array list
+	// define a row, a class to store row content from the csv file 
+	public static 	ArrayList<Row> readCsvFile(String fileName) {
 
+       	ArrayList<Row> rows = new ArrayList<Row>();
+       	
 		FileReader fileReader = null;
 		
 		CSVParser csvFileParser = null;
@@ -37,7 +42,7 @@ public class CsvFileReader {
         try {
         	
         	//Create a new list of student to be filled by CSV file data 
-        	List students = new ArrayList();
+ 
             
             //initialize FileReader object
             fileReader = new FileReader(fileName);
@@ -46,20 +51,26 @@ public class CsvFileReader {
             csvFileParser = new CSVParser(fileReader, csvFileFormat);
             
             //Get a list of CSV file records
-            List csvRecords = csvFileParser.getRecords(); 
-            
+            List<CSVRecord> csvRecords = csvFileParser.getRecords(); 
+           
             //Read the CSV file records starting from the second record to skip the header
             for (int i = 1; i < csvRecords.size(); i++) {
             	CSVRecord record = csvRecords.get(i);
             	//Create a new student object and fill his data
-            	Student student = new Student(Long.parseLong(record.get(STUDENT_ID)), record.get(STUDENT_FNAME), record.get(STUDENT_LNAME), record.get(STUDENT_GENDER), Integer.parseInt(record.get(STUDENT_AGE)));
-                students.add(student);	
+            	Row row = new Row(record.get(answer), Integer.parseInt(record.get(score)),
+            			Long.parseLong(record.get(answer_Id)), record.get(question_Tags), 
+            						 record.get(Question_Body),Integer.parseInt(record.get(answer_Count)),Long.parseLong(record.get(question_Id)) );
+                rows.add(row);	
 			}
-            
-            //Print the new student list
-            for (Student student : students) {
-				System.out.println(student.toString());
-			}
+
+            System.out.println("Number of record extracted from the CSV file(s): "+ rows.size());
+//            
+//            for (int i = 0; i < 2; i++) {
+//            	
+//            	 System.out.println("Row number: "+i+"  answer Id: "+  rows.get(i).answerId + " Answer body: \n "+rows.get(i).answersBody);
+//            }
+
+          
         } 
         catch (Exception e) {
         	System.out.println("Error in CsvFileReader !!!");
@@ -68,11 +79,13 @@ public class CsvFileReader {
             try {
                 fileReader.close();
                 csvFileParser.close();
+            
             } catch (IOException e) {
             	System.out.println("Error while closing fileReader/csvFileParser !!!");
                 e.printStackTrace();
             }
         }
+		return rows;
 
 	}
 
