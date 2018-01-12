@@ -24,6 +24,8 @@ public class StackOverflow {
 
 		String fileName= "java Answers.csv";
 		rowsFromCsvFile=CsvFileReader.readCsvFile(fileName);
+		
+
 
 		rowsProcessed=CodeParser.convertToSource(rowsFromCsvFile);
 		
@@ -34,7 +36,7 @@ public class StackOverflow {
 			System.out.println(row.answerId+"  "+ row.questionId+"  \n"+ row.getAnswerBody());
 			System.out.println("---------------------------------------------------------------------------------------------------------------------------------------");
 			i++;
-			if (i>10) break;
+			if (i>30) break;
 		}
 		
 
