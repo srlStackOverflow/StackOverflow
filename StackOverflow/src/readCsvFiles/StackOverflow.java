@@ -22,7 +22,7 @@ public class StackOverflow {
 
 	
 
-		String fileName= "java Answers.csv";
+		String fileName= "With_Dup_IDs.csv";
 		rowsFromCsvFile=CsvFileReader.readCsvFile(fileName);
 		
 
@@ -33,7 +33,10 @@ public class StackOverflow {
 		
 		int i=0;
 		for (Row row:rowsProcessed) {
-			System.out.println(row.answerId+"  "+ row.questionId+"  \n"+ row.getAnswerBody());
+			// check for duplicate posts
+			if (row.duplicate_Ids.isEmpty())
+				continue;
+			System.out.println(row.answerId+"  "+ row.questionId+" "+ row.duplicate_Ids+ "  \n");//+ row.getAnswerBody());
 			System.out.println("---------------------------------------------------------------------------------------------------------------------------------------");
 			i++;
 			if (i>30) break;

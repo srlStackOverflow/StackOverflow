@@ -8,8 +8,9 @@ public class Row {
 	public String questionBody;
 	public int answerCount;
 	public long questionId;
-	
-	public Row(String answers, int score, long answer_Id, String tags, String body,int answerCount,long q_Id ) {
+	public String duplicate_Ids;
+
+	public Row(String answers, int score, long answer_Id, String tags, String body,int answerCount,long q_Id, String dup_ids ) {
 		super();
 		this.answersBody=answers;
 		this.answerScore=score;
@@ -17,12 +18,13 @@ public class Row {
 		this.questionTags=tags;
 		this.questionBody=body;
 		this.answerCount=answerCount;
-		this.questionId=q_Id;		
-		
+		this.questionId=q_Id;
+		this.duplicate_Ids = dup_ids;
+
 	}
 
 	public Row(Object object, Object object2, Object object3, Object object4, Object object5, Object object6,
-			Object object7) {
+			Object object7, Object object8) {
 		// TODO Auto-generated constructor stub
 		this.answersBody=object.toString();
 		this.answerScore=Integer.parseInt(object2.toString());
@@ -31,6 +33,7 @@ public class Row {
 		this.questionBody=object5.toString();
 		this.answerCount=Integer.parseInt(object6.toString());
 		this.questionId=Long.parseLong(object7.toString());
+		this.duplicate_Ids = object8.toString();
 		
 	}
 	

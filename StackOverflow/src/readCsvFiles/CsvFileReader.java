@@ -13,35 +13,36 @@ import org.apache.commons.csv.CSVRecord;
  *
  */
 public class CsvFileReader {
-	
-	//CSV file header
-    private static final String [] FILE_HEADER_MAPPING = {"Answeres", "Score", "Post Link", "Question Tags", "Body", "AnswerCount", "Id"};
-	
-	//Student attributes
-	private static final String answer = "Answeres";
-	private static final String score = "Score";
-	private static final String answer_Id = "Post Link";
-	private static final String question_Tags = "Question Tags"; 
-	private static final String Question_Body = "Body";
-	private static final String answer_Count = "AnswerCount"; 
-	private static final String question_Id = "Id";
-	
-	// Read csv file and return its contenet in an array list
-	// define a row, a class to store row content from the csv file 
-	public static 	ArrayList<Row> readCsvFile(String fileName) {
+    
+    //CSV file header
+    private static final String [] FILE_HEADER_MAPPING = {"Answeres", "Score", "Post Link", "Question Tags", "Body", "AnswerCount", "Id", "Dup_IDs"};
+    
+    //Student attributes
+    private static final String answer = "Answeres";
+    private static final String score = "Score";
+    private static final String answer_Id = "Post Link";
+    private static final String question_Tags = "Question Tags"; 
+    private static final String Question_Body = "Body";
+    private static final String answer_Count = "AnswerCount"; 
+    private static final String question_Id = "Id";
+    private static final String duplicate_Ids = "Dup_IDs";
+    
+    // Read csv file and return its contenet in an array list
+    // define a row, a class to store row content from the csv file 
+    public static   ArrayList<Row> readCsvFile(String fileName) {
 
-       	ArrayList<Row> rows = new ArrayList<Row>();
-       	
-		FileReader fileReader = null;
-		
-		CSVParser csvFileParser = null;
-		
-		//Create the CSVFormat object with the header mapping
+        ArrayList<Row> rows = new ArrayList<Row>();
+        
+        FileReader fileReader = null;
+        
+        CSVParser csvFileParser = null;
+        
+        //Create the CSVFormat object with the header mapping
         CSVFormat csvFileFormat = CSVFormat.DEFAULT.withHeader(FILE_HEADER_MAPPING);
      
         try {
-        	
-        	//Create a new list of student to be filled by CSV file data 
+            
+            //Create a new list of student to be filled by CSV file data 
  
             
             //initialize FileReader object
@@ -55,25 +56,25 @@ public class CsvFileReader {
            
             //Read the CSV file records starting from the second record to skip the header
             for (int i = 1; i < csvRecords.size(); i++) {
-            	CSVRecord record = csvRecords.get(i);
-            	//Create a new student object and fill his data
-            	Row row = new Row(record.get(answer), Integer.parseInt(record.get(score)),
-            			Long.parseLong(record.get(answer_Id)), record.get(question_Tags), 
-            						 record.get(Question_Body),Integer.parseInt(record.get(answer_Count)),Long.parseLong(record.get(question_Id)) );
-                rows.add(row);	
-			}
+                CSVRecord record = csvRecords.get(i);
+                //Create a new student object and fill his data
+                Row row = new Row(record.get(answer), Integer.parseInt(record.get(score)),
+                        Long.parseLong(record.get(answer_Id)), record.get(question_Tags), 
+                                     record.get(Question_Body),Integer.parseInt(record.get(answer_Count)),Long.parseLong(record.get(question_Id)),record.get(duplicate_Ids) );
+                rows.add(row);  
+            }
 
             System.out.println("Number of record extracted from the CSV file(s): "+ rows.size());
 //            
 //            for (int i = 0; i < 2; i++) {
-//            	
-//            	 System.out.println("Row number: "+i+"  answer Id: "+  rows.get(i).answerId + " Answer body: \n "+rows.get(i).answersBody);
+//              
+//               System.out.println("Row number: "+i+"  answer Id: "+  rows.get(i).answerId + " Answer body: \n "+rows.get(i).answersBody);
 //            }
 
           
         } 
         catch (Exception e) {
-        	System.out.println("Error in CsvFileReader !!!");
+            System.out.println("Error in CsvFileReader !!!");
             e.printStackTrace();
         } finally {
             try {
@@ -81,12 +82,12 @@ public class CsvFileReader {
                 csvFileParser.close();
             
             } catch (IOException e) {
-            	System.out.println("Error while closing fileReader/csvFileParser !!!");
+                System.out.println("Error while closing fileReader/csvFileParser !!!");
                 e.printStackTrace();
             }
         }
-		return rows;
+        return rows;
 
-	}
+    }
 
 }
