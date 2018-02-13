@@ -1,13 +1,16 @@
-
-*.xml
-StackOverflow/bin/.DS_Store
-*.class
+# Eclipse
+.classpath
+.project
+.settings/
+ 
+# Intellij
+.idea/
 *.iml
-*.class
-*.class
-*.class
-StackOverflow/bin/readCsvFiles/Answers.class
-*.class
-*.class
-*.class
-*.class
+*.iws
+ 
+# Mac
+.DS_Store
+ 
+# Maven
+log/
+target/
