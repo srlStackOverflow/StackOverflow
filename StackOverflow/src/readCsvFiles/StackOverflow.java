@@ -1,6 +1,7 @@
 package readCsvFiles;
 
 import java.util.*;
+import java.io.*;
 
 public class StackOverflow {
 	
@@ -28,13 +29,12 @@ public class StackOverflow {
 
             // 2. Cluster Locator
             Cluster_Locator(row.questionId, row.duplicate_Ids);
-
-
-            // 3. Storage / Write result
-
 		}
 
+        // 3. Storage / Write result
+        StoreResults("CSV");
 
+		// Debug
 		for(Set<Long> cluster : Clusters){
 		    System.out.println(cluster.toString());
 		    System.out.println("====================================");
@@ -98,4 +98,37 @@ public class StackOverflow {
         }
     }
 
+    private static void StoreResults(String type){
+	    if(type.equals("CSV")){
+	        Export2CSV();
+        }
+
+        if(type.equals("SQL")){
+            System.out.println("Under Construction");
+        }
+    }
+
+    private static void Export2CSV(){
+	    if (Clusters.size() == 0){
+	        System.out.println("No Clusters");
+	        return;
+        }
+
+        try {
+            PrintWriter pw = new PrintWriter(new File("out.csv"));
+            StringBuilder sb = new StringBuilder();
+            for(Set<Long> cluster : Clusters){
+                for (Long num : cluster){
+                    sb.append(num);
+                    sb.append(',');
+                }
+                sb.append("\n");
+            }
+
+            pw.write(sb.toString());
+            pw.close();
+        }catch(Exception e){
+	        System.out.println(e.getMessage());
+        }
+    }
 }
