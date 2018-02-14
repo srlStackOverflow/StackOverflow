@@ -39,7 +39,8 @@ public class StackOverflow {
 		    System.out.println(cluster.toString());
 		    System.out.println("====================================");
         }
-        System.out.println(Clusters.size());
+        System.out.println(Clusters.size()+ " clusters.");
+        System.out.println("One line for each cluster.");
 	}
 
 	private static boolean Answer_Filter(String answer){
