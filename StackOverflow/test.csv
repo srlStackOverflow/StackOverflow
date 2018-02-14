@@ -1,0 +1,2555 @@
+Answeres,Score,Post Link,Question Tags,Body,AnswerCount,Id,Dup_IDs
+"<p>Committing and edit to a <code>TextFieldListCell</code> work like this:</p>
+
+<ul>
+<li><p>If a <code>onEditCommit</code> handler is set, the <code>ListView</code> assumes this handler is used to handle the edit.</p></li>
+<li><p>If no <code>onEditCommit</code> handler is set, the result of converting the <code>TextField</code> content to a item using the converter is set at the index of the item in the cell.</p></li>
+</ul>
+
+<p>Since you use a <code>SortedList</code> with the <code>ListView</code> calling <code>set</code> yields an exception (the list is only a view of a different <code>ObservableList</code> and cannot  be directly modified). Setting the <code>onEditCommit</code> handler prevents <code>ListView</code> from calling <code>SortedList.set</code> and thus prevents the error.</p>
+",0,48726608,<listview><javafx>,"<p>I've made a simple to-do list application using JavaFX. After doing some research I figured out how to make the ListView editable (such that double-clicking a cell allows you to change the text inside). Everything works fine as of now, but I am very confused on what role the setOnEditCommit method plays in my code. Here is my entire initialize method, the setOnEditCommit is at the bottom. </p>
+
+<pre><code>    public void initialize()
+{
+    listContextMenu = new ContextMenu();
+    MenuItem deleteMenuItem = new MenuItem(""Delete"");
+    deleteMenuItem.setOnAction(new EventHandler&lt;ActionEvent&gt;() {
+        @Override
+        public void handle(ActionEvent event) {
+            TodoItem item = todoListView.getSelectionModel().getSelectedItem();
+            deleteItem(item);
+        }
+    });
+
+    listContextMenu.getItems().addAll(deleteMenuItem);
+    todoListView.getSelectionModel().selectedItemProperty().addListener(new ChangeListener&lt;TodoItem&gt;() {
+        @Override
+        public void changed(ObservableValue&lt;? extends TodoItem&gt; observable, TodoItem oldValue, TodoItem newValue) {
+            if(newValue != null)
+            {
+                TodoItem item = todoListView.getSelectionModel().getSelectedItem();
+                itemDetailsTextArea.setText(item.getDetails());
+                DateTimeFormatter df = DateTimeFormatter.ofPattern(""MMMM dd, yyyy"");
+                deadlineLabel.setText(item.getDeadline().format(df));
+            }
+        }
+    });
+
+    wantAllItems = new Predicate&lt;TodoItem&gt;() {
+        @Override
+        public boolean test(TodoItem todoItem) {
+            return true;
+        }
+    };
+
+    wantTodaysItems = new Predicate&lt;TodoItem&gt;() {
+        @Override
+        public boolean test(TodoItem todoItem) {
+            return todoItem.getDeadline().equals(LocalDate.now());
+        }
+    };
+    filteredList = new FilteredList&lt;TodoItem&gt;(TodoData.getInstance().getTodoitems(), wantAllItems);
+    SortedList&lt;TodoItem&gt; sortedList = new SortedList&lt;TodoItem&gt;(filteredList,
+            new Comparator&lt;TodoItem&gt;() {
+                @Override
+                public int compare(TodoItem o1, TodoItem o2) {
+                    return o1.getDeadline().compareTo(o2.getDeadline());
+                }
+            });
+
+    //todoListView.setItems(TodoData.getInstance().getTodoitems());
+    todoListView.setItems(sortedList);
+    todoListView.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
+    todoListView.getSelectionModel().selectFirst();
+
+    todoListView.setEditable(true);
+
+    todoListView.setCellFactory(new Callback&lt;ListView&lt;TodoItem&gt;, ListCell&lt;TodoItem&gt;&gt;() {
+        @Override
+        public ListCell&lt;TodoItem&gt; call(ListView&lt;TodoItem&gt; lv) {
+            TextFieldListCell&lt;TodoItem&gt; cell = new TextFieldListCell&lt;TodoItem&gt;(){
+                @Override
+                public void updateItem(TodoItem item, boolean empty) {
+                    super.updateItem(item, empty);
+
+                    if(empty){
+                        setText(null);
+                    } else {
+                        setText(item.getShortDescription());
+                        if(item.getDeadline().isBefore(LocalDate.now().plusDays(1)))
+                            setTextFill(Color.RED);
+                        else if(item.getDeadline().equals(LocalDate.now().plusDays(1)))
+                            setTextFill(Color.BROWN);
+                    }
+                }
+
+            };
+
+            cell.emptyProperty().addListener(
+                    (obs, wasEmpty, isNowEmpty) -&gt;
+                    {
+                        if(isNowEmpty)
+                            cell.setContextMenu(null);
+                        else
+                            cell.setContextMenu(listContextMenu);
+                    }
+            );
+
+            cell.setConverter(new StringConverter&lt;TodoItem&gt;() {
+                @Override
+                public String toString(TodoItem object) {
+                    return object.toString();
+                }
+
+                @Override
+                public TodoItem fromString(String string) {
+                    cell.getItem().setShortDescription(string);
+                    return cell.getItem();
+                }
+            });
+            return cell;
+        }
+    });
+
+    // this is the method where the source of the exception is being reported
+    todoListView.setOnEditCommit(new EventHandler&lt;ListView.EditEvent&lt;TodoItem&gt;&gt;() {
+        @Override
+        public void handle(ListView.EditEvent&lt;TodoItem&gt; e) {
+        }
+    });
+}
+</code></pre>
+
+<p>Now im confused because commenting out the setOnEditCommit method causes an exception. So clearly I need it. However, the overridden handle function inside does nothing, there are no lines of code inside. So why is it necessary to keep this and what does it do? When is this called?</p>
+
+<p>Keep in mind my to-do list functions just fine. The edits are committed and saved so you can see them on the next run. I feel like I am grossly misunderstanding something. </p>
+",2,48726608,48722197
+"<p>According to the <a href=""https://docs.oracle.com/javase/9/docs/api/javafx/scene/control/ListView.html"" rel=""nofollow noreferrer"">documentation</a>:</p>
+
+<blockquote>
+  <p>By default the ListView edit commit handler is non-null, with a default handler that attempts to overwrite the property value for the item in the currently-being-edited row. ... It is very important to note that if you call <code>setOnEditCommit(javafx.event.EventHandler)</code> with your own EventHandler, then you will be removing the default handler.</p>
+</blockquote>
+
+<p>The <code>TextFieldListCell</code>, when you commit the edit, fires a <code>ListView.EditEvent</code> event whose <code>newValue</code> is the value created by passing the text field's text to the converter's <code>fromString()</code> method.</p>
+
+<p>The default <code>onEditCommit()</code> handler takes that value and sets it in the list. I.e. it does something along the lines of</p>
+
+<pre><code>event.getSource().getItems().set(event.getIndex(), event.getNewValue());
+</code></pre>
+
+<p>Since you are using an <em>unmodifiable</em> list (a <code>SortedList</code>) as the items list for the <code>ListView</code>, trying to set a value in it throws an <code>UnsupportedOperationException</code>.</p>
+
+<p>By explicitly setting the <code>onEditCommit</code> handler, you remove the default one, and hence the exception goes away. Since your <code>converter</code> actually already does the work of updating the data (which a purist might argue violates separation of concerns), you don't actually need to do anything in this handler.</p>
+
+<p>If your converter were not modifying the item for you (say, e.g., by returning a new <code>TodoItem</code>):</p>
+
+<pre><code>cell.setConverter(new StringConverter&lt;TodoItem&gt;() {
+    @Override
+    public String toString(TodoItem object) {
+        // shouldn't this return the property that you're editing?
+        return object.getShortDescription();
+    }
+
+    @Override
+    public TodoItem fromString(String string) {
+        TodoItem currentItem = cell.getItem();
+        TodoItem editedItem = new TodoItem();
+        editedItem.setShortDescription(string);
+        editedItem.setDeadline(currentItem.getDeadline());
+        // etc...
+        return editedItem ;
+    }
+});
+</code></pre>
+
+<p>then you would need your handler to update the backing list, which you could do with</p>
+
+<pre><code>todoListView.setOnEditCommit(e -&gt; {
+    int indexInSortedList = e.getIndex();
+    int indexInFilteredList = sortedList.getSourceIndex(indexInSortedList);
+    int indexInOriginalList = filteredList.getSourceIndex(indexInFilteredList);
+    TodoData.getInstance().getTodoitems().set(indexInOriginalList, e.getNewValue());
+});
+</code></pre>
+
+<p>(assuming the list returned by <code>getTodoitems()</code> is modifiable).</p>
+",0,48726608,<listview><javafx>,"<p>I've made a simple to-do list application using JavaFX. After doing some research I figured out how to make the ListView editable (such that double-clicking a cell allows you to change the text inside). Everything works fine as of now, but I am very confused on what role the setOnEditCommit method plays in my code. Here is my entire initialize method, the setOnEditCommit is at the bottom. </p>
+
+<pre><code>    public void initialize()
+{
+    listContextMenu = new ContextMenu();
+    MenuItem deleteMenuItem = new MenuItem(""Delete"");
+    deleteMenuItem.setOnAction(new EventHandler&lt;ActionEvent&gt;() {
+        @Override
+        public void handle(ActionEvent event) {
+            TodoItem item = todoListView.getSelectionModel().getSelectedItem();
+            deleteItem(item);
+        }
+    });
+
+    listContextMenu.getItems().addAll(deleteMenuItem);
+    todoListView.getSelectionModel().selectedItemProperty().addListener(new ChangeListener&lt;TodoItem&gt;() {
+        @Override
+        public void changed(ObservableValue&lt;? extends TodoItem&gt; observable, TodoItem oldValue, TodoItem newValue) {
+            if(newValue != null)
+            {
+                TodoItem item = todoListView.getSelectionModel().getSelectedItem();
+                itemDetailsTextArea.setText(item.getDetails());
+                DateTimeFormatter df = DateTimeFormatter.ofPattern(""MMMM dd, yyyy"");
+                deadlineLabel.setText(item.getDeadline().format(df));
+            }
+        }
+    });
+
+    wantAllItems = new Predicate&lt;TodoItem&gt;() {
+        @Override
+        public boolean test(TodoItem todoItem) {
+            return true;
+        }
+    };
+
+    wantTodaysItems = new Predicate&lt;TodoItem&gt;() {
+        @Override
+        public boolean test(TodoItem todoItem) {
+            return todoItem.getDeadline().equals(LocalDate.now());
+        }
+    };
+    filteredList = new FilteredList&lt;TodoItem&gt;(TodoData.getInstance().getTodoitems(), wantAllItems);
+    SortedList&lt;TodoItem&gt; sortedList = new SortedList&lt;TodoItem&gt;(filteredList,
+            new Comparator&lt;TodoItem&gt;() {
+                @Override
+                public int compare(TodoItem o1, TodoItem o2) {
+                    return o1.getDeadline().compareTo(o2.getDeadline());
+                }
+            });
+
+    //todoListView.setItems(TodoData.getInstance().getTodoitems());
+    todoListView.setItems(sortedList);
+    todoListView.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
+    todoListView.getSelectionModel().selectFirst();
+
+    todoListView.setEditable(true);
+
+    todoListView.setCellFactory(new Callback&lt;ListView&lt;TodoItem&gt;, ListCell&lt;TodoItem&gt;&gt;() {
+        @Override
+        public ListCell&lt;TodoItem&gt; call(ListView&lt;TodoItem&gt; lv) {
+            TextFieldListCell&lt;TodoItem&gt; cell = new TextFieldListCell&lt;TodoItem&gt;(){
+                @Override
+                public void updateItem(TodoItem item, boolean empty) {
+                    super.updateItem(item, empty);
+
+                    if(empty){
+                        setText(null);
+                    } else {
+                        setText(item.getShortDescription());
+                        if(item.getDeadline().isBefore(LocalDate.now().plusDays(1)))
+                            setTextFill(Color.RED);
+                        else if(item.getDeadline().equals(LocalDate.now().plusDays(1)))
+                            setTextFill(Color.BROWN);
+                    }
+                }
+
+            };
+
+            cell.emptyProperty().addListener(
+                    (obs, wasEmpty, isNowEmpty) -&gt;
+                    {
+                        if(isNowEmpty)
+                            cell.setContextMenu(null);
+                        else
+                            cell.setContextMenu(listContextMenu);
+                    }
+            );
+
+            cell.setConverter(new StringConverter&lt;TodoItem&gt;() {
+                @Override
+                public String toString(TodoItem object) {
+                    return object.toString();
+                }
+
+                @Override
+                public TodoItem fromString(String string) {
+                    cell.getItem().setShortDescription(string);
+                    return cell.getItem();
+                }
+            });
+            return cell;
+        }
+    });
+
+    // this is the method where the source of the exception is being reported
+    todoListView.setOnEditCommit(new EventHandler&lt;ListView.EditEvent&lt;TodoItem&gt;&gt;() {
+        @Override
+        public void handle(ListView.EditEvent&lt;TodoItem&gt; e) {
+        }
+    });
+}
+</code></pre>
+
+<p>Now im confused because commenting out the setOnEditCommit method causes an exception. So clearly I need it. However, the overridden handle function inside does nothing, there are no lines of code inside. So why is it necessary to keep this and what does it do? When is this called?</p>
+
+<p>Keep in mind my to-do list functions just fine. The edits are committed and saved so you can see them on the next run. I feel like I am grossly misunderstanding something. </p>
+",2,48726608,48722197
+"<p>A possible solution is to pack two <code>ProgressBar</code>s into an <code>HBox</code>. <br/>
+The following should not be regarded as an implementation, but as a demonstration of the idea: </p>
+
+<pre><code>import javafx.application.Application;
+import javafx.scene.Scene;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.layout.HBox;
+import javafx.stage.Stage;
+
+public class BiDiProgressBar extends Application {
+
+    public static void main(String[] args) { launch(args); }
+
+    @Override public void start(Stage stage) {
+
+        final HBox indicator = new Indicator(60);
+        stage.setScene(new Scene(indicator));
+        stage.show();
+    }
+
+    class Indicator extends HBox{
+
+        Indicator(int dayStatValue){
+
+            super(0);
+            ProgressBar negProgBar = new ProgressBar();
+            negProgBar.setPrefWidth(200); //calculate width based on day start value
+            negProgBar.setProgress(0.4);   //progress should be bound to a property to make it dynamic
+            negProgBar.rotateProperty().set(180); //rotate to progress from left to right
+
+            ProgressBar posProgBar = new ProgressBar();
+            posProgBar.setPrefWidth(300); //calculate width based on day start value
+            posProgBar.setProgress(0.2);
+            getChildren().addAll(negProgBar, posProgBar);
+
+            getStylesheets().add(getClass().getResource(""css/indicator.css"").toExternalForm());
+            negProgBar.getStyleClass().add(""neg-bar"");
+            posProgBar.getStyleClass().add(""pos-bar"");
+        }
+    }
+}
+</code></pre>
+
+<p>The result looks like this:</p>
+
+<p><a href=""https://i.stack.imgur.com/RfoPW.jpg"" rel=""nofollow noreferrer""><img src=""https://i.stack.imgur.com/RfoPW.jpg"" alt=""enter image description here""></a></p>
+
+<p>The point where the two <code>ProgressBar</code> meet represents the day start value. 
+In the final implementation only one progress bar should be active at any given time. </p>
+
+<p><strong>indicator.css</strong></p>
+
+<pre><code>.root { -fx-background-color: black; -fx-padding: 15; }
+.progress-bar &gt; .track {
+  -fx-text-box-border: white;
+  -fx-control-inner-background: lightgrey;
+  -fx-border-radius: 0px ;
+  -fx-background-radius: 0px ;
+}
+
+.pos-bar  { -fx-accent: green; }
+.neg-bar  { -fx-accent: red; }
+</code></pre>
+",1,48722197,<java><css><javafx><javafx-8><javafx-2>,"<p><strong>Background:</strong></p>
+
+<p>Am trying to create a Visual representation of realtime stock movement like the 2 attached images (Green indicating positive, Amber negative &amp; value at left bottom Day's Low, value at right bottom Day's High) within a TableView in JavaFx. The movement will be controlled by the realtime data streaming. So the slide marker needs to be able to slide both ways with color changing if it croses Day's Open value </p>
+
+<p><strong>Research:</strong></p>
+
+<p>I always refer to this wonderful -> <a href=""https://stackoverflow.com/questions/19417246/how-can-i-style-the-progressbar-component-in-javafx"">Link</a> but in this case seek guidance as am not sure if its feasible with Progress Bar or Slider. </p>
+
+<p>Any pointers on this can be achieved will be much appreciated.</p>
+
+<p><a href=""https://i.stack.imgur.com/jQqNb.jpg"" rel=""nofollow noreferrer""><img src=""https://i.stack.imgur.com/jQqNb.jpg"" alt=""Positive Value""></a></p>
+
+<p><a href=""https://i.stack.imgur.com/n4Ew7.jpg"" rel=""nofollow noreferrer""><img src=""https://i.stack.imgur.com/n4Ew7.jpg"" alt=""Negative Value""></a></p>
+",2,48722197,
+"<p>You can do this fairly simply with either a slider or progress bar, using CSS to change the background color of the track. For a progress bar, just make the bar transparent.</p>
+
+<p>The basic idea is to use a linear ""gradient"". If the starting value is <code>x%</code> and the current value <code>y%</code>, with <code>y &gt; x</code>, you need color stops at</p>
+
+<pre><code>(default 0%, default x%, green x%, green y%, default y%, default 100%)
+</code></pre>
+
+<p>where <code>default</code> is the default background color. (Similarly with red replacing green and <code>x</code> and <code>y</code> switched if <code>y &lt; x</code>.)</p>
+
+<p>Here's a SSCCE:</p>
+
+<pre><code>import javafx.application.Application;
+import javafx.beans.binding.Bindings;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.ProgressBar;
+import javafx.scene.control.Slider;
+import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+
+public class BidirectionalSlider extends Application {
+
+    @Override
+    public void start(Stage primaryStage) {
+        double startingValue = 0.5 ;
+        Slider slider = new Slider(0, 1, startingValue);
+
+        slider.styleProperty().bind(Bindings.createStringBinding(() -&gt; {
+
+            double min = slider.getMin();
+            double max = slider.getMax();
+            double value = slider.getValue() ;
+
+            return createSliderStyle(startingValue, min, max, value);
+
+        }, slider.valueProperty()));
+
+        ProgressBar progressBar1 = new ProgressBar(0.1);
+        ProgressBar progressBar2 = new ProgressBar(0.9);
+
+        progressBar1.styleProperty().bind(Bindings.createStringBinding(() -&gt; 
+            createSliderStyle(startingValue, 0.0, 1.0, progressBar1.getProgress()), 
+            progressBar1.progressProperty()));
+
+        progressBar2.styleProperty().bind(Bindings.createStringBinding(() -&gt; 
+            createSliderStyle(startingValue, 0.0, 1.0, progressBar2.getProgress()), 
+            progressBar2.progressProperty()));
+
+        VBox root = new VBox(5, slider, progressBar1, progressBar2);
+        root.setAlignment(Pos.CENTER);
+
+        Scene scene = new Scene(root, 400, 400);
+        scene.getStylesheets().add(""style.css"");
+        primaryStage.setScene(scene);
+        primaryStage.show();
+    }
+
+    private String createSliderStyle(double startingValue, double min, double max, double value) {
+        StringBuilder gradient = new StringBuilder(""-slider-track-color: "");
+        String defaultBG = ""derive(-fx-control-inner-background, -5%) "" ;
+        gradient.append(""linear-gradient(to right, "").append(defaultBG).append(""0%, "") ;
+
+        double valuePercent = 100.0 * (value - min) / (max - min);
+
+        double startingValuePercent = startingValue * 100.0;
+
+
+        if (valuePercent &gt; startingValuePercent) {
+            gradient.append(defaultBG).append(startingValuePercent).append(""%, "");
+            gradient.append(""green "").append(startingValuePercent).append(""%, "");
+            gradient.append(""green "").append(valuePercent).append(""%, "");
+            gradient.append(defaultBG).append(valuePercent).append(""%, "");
+            gradient.append(defaultBG).append(""100%); "");
+        } else {
+            gradient.append(defaultBG).append(valuePercent).append(""%, "");
+            gradient.append(""red "").append(valuePercent).append(""%, "");
+            gradient.append(""red "").append(startingValuePercent).append(""%, "");
+            gradient.append(defaultBG).append(startingValuePercent).append(""%, "");
+            gradient.append(defaultBG).append(""100%); "");               
+        }
+        return gradient.toString() ;
+    }
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+}
+</code></pre>
+
+<p>and the base CSS file (<code>style.css</code>):</p>
+
+<pre class=""lang-css prettyprint-override""><code>.slider, .progress-bar {
+    -slider-track-color: derive(-fx-control-inner-background, -5%) ;
+}
+
+.slider .track, .progress-bar .track {
+    -fx-background-color: 
+        -fx-shadow-highlight-color,
+        linear-gradient(to bottom, derive(-fx-text-box-border, -10%), -fx-text-box-border),
+        -slider-track-color ;
+}
+
+.progress-bar .bar {
+    -fx-background-color: transparent ;
+}
+</code></pre>
+
+<p><a href=""https://i.stack.imgur.com/q6cMN.png"" rel=""nofollow noreferrer""><img src=""https://i.stack.imgur.com/q6cMN.png"" alt=""enter image description here""></a>
+<a href=""https://i.stack.imgur.com/gtxe6.png"" rel=""nofollow noreferrer""><img src=""https://i.stack.imgur.com/gtxe6.png"" alt=""enter image description here""></a></p>
+",1,48722197,<java><css><javafx><javafx-8><javafx-2>,"<p><strong>Background:</strong></p>
+
+<p>Am trying to create a Visual representation of realtime stock movement like the 2 attached images (Green indicating positive, Amber negative &amp; value at left bottom Day's Low, value at right bottom Day's High) within a TableView in JavaFx. The movement will be controlled by the realtime data streaming. So the slide marker needs to be able to slide both ways with color changing if it croses Day's Open value </p>
+
+<p><strong>Research:</strong></p>
+
+<p>I always refer to this wonderful -> <a href=""https://stackoverflow.com/questions/19417246/how-can-i-style-the-progressbar-component-in-javafx"">Link</a> but in this case seek guidance as am not sure if its feasible with Progress Bar or Slider. </p>
+
+<p>Any pointers on this can be achieved will be much appreciated.</p>
+
+<p><a href=""https://i.stack.imgur.com/jQqNb.jpg"" rel=""nofollow noreferrer""><img src=""https://i.stack.imgur.com/jQqNb.jpg"" alt=""Positive Value""></a></p>
+
+<p><a href=""https://i.stack.imgur.com/n4Ew7.jpg"" rel=""nofollow noreferrer""><img src=""https://i.stack.imgur.com/n4Ew7.jpg"" alt=""Negative Value""></a></p>
+",2,48722197,
+"<p>public class Scatter extends Application {</p>
+
+<pre><code>public static void main(String[] args) {
+    launch(args);
+}
+@Override
+public void start(Stage stage) throws Exception {
+    final NumberAxis xAxis = new NumberAxis();
+    final NumberAxis yAxis = new NumberAxis();
+    final BubbleChart bc = new BubbleChart(xAxis, yAxis);
+    XYChart.Series&lt;Number, Number&gt; series1 = new XYChart.Series();
+    XYChart.Series&lt;Number, Number&gt; series2 = new XYChart.Series();
+    XYChart.Series&lt;Number, Number&gt; series3 = new XYChart.Series();
+    XYChart.Series&lt;Number, Number&gt; series4 = new XYChart.Series();
+
+    series1.getData().add(new XYChart.Data(1, 0.1, 0.02));
+
+    series2.getData().add(new XYChart.Data(2, 0.2, 0.03));
+    series3.getData().add(new XYChart.Data(0.5, -0.4, 0.04));
+    series4.getData().add(new XYChart.Data(0.75, -0.25, 0.05));
+    Set&lt;XYChart.Series&gt; bubbleSeries = new HashSet&lt;&gt;();
+
+    bubbleSeries.add(series1);
+    bubbleSeries.add(series2);
+    bubbleSeries.add(series3);
+    bubbleSeries.add(series4);
+
+
+    bc.getData().addAll(series1,series2,series3,series4);
+    Scene scene = new Scene(bc);
+    stage.setScene(scene);
+    stage.show();
+    Integer i = 0;
+
+    for(XYChart.Series&lt;Number, Number&gt; obj : bubbleSeries){
+        for (XYChart.Data&lt;Number, Number&gt; data : obj.getData()) {
+            Text text = new Text(i.toString());
+            ((StackPane) data.getNode()).getChildren().add(text);
+            i++;
+        }
+    }
+}
+</code></pre>
+
+<p>}</p>
+",0,48718874,<java><javafx>,"<p>I'm a new user of JavaFX. I'm trying to draw a colored bubble chart like below: <a href=""https://i.stack.imgur.com/cy3lZ.png"" rel=""nofollow noreferrer"">Colored Bubble Chart Example</a></p>
+
+<p>I write the following code which can control both bubble position and size </p>
+
+<pre><code>import javafx.application.Application;
+import javafx.scene.Scene;
+import javafx.scene.chart.BubbleChart;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.XYChart;
+import javafx.scene.layout.StackPane;
+import javafx.scene.text.Text;
+import javafx.stage.Stage;
+public class Scatter extends Application {
+    public static void main(String[] args) {
+        launch(args);
+    }
+    public void start(Stage stage) throws Exception {
+        final NumberAxis xAxis = new NumberAxis();
+        final NumberAxis yAxis = new NumberAxis();
+        final BubbleChart bc = new BubbleChart(xAxis, yAxis);
+        XYChart.Series&lt;Number, Number&gt; series1 = new XYChart.Series();
+        series1.getData().add(new XYChart.Data(1, 0.1, 0.02));
+        series1.getData().add(new XYChart.Data(2, 0.2, 0.03));
+        series1.getData().add(new XYChart.Data(0.5, -0.4, 0.04));
+        series1.getData().add(new XYChart.Data(0.75, -0.25, 0.05));
+        bc.getData().addAll(series1);
+        Scene scene = new Scene(bc);
+        stage.setScene(scene);
+        stage.show();
+        Integer i = 0;
+        for (XYChart.Data&lt;Number, Number&gt; data : series1.getData()) {
+            Text text = new Text(i.toString());
+            ((StackPane) data.getNode()).getChildren().add(text);
+            i++;
+        }
+    }
+}
+</code></pre>
+
+<p>as the following picture
+<a href=""https://i.stack.imgur.com/y7bQD.png"" rel=""nofollow noreferrer"">JavaFX Code Result</a></p>
+
+<p>But I didn't find where I can change the color of each bubble. Can someone help me? Thanks in advance!</p>
+",2,48718874,
+"<pre><code>import javafx.application.Application;
+import javafx.scene.Scene;
+import javafx.scene.chart.BubbleChart;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.XYChart;
+import javafx.scene.layout.StackPane;
+import javafx.scene.text.Font;
+import javafx.scene.text.Text;
+import javafx.stage.Stage;
+public class ColorBubble extends Application {
+    public static void main(String[] args) {
+        launch(args);
+    }
+    public void start(Stage stage) throws Exception {
+        final NumberAxis xAxis = new NumberAxis();
+        final NumberAxis yAxis = new NumberAxis();
+        final BubbleChart bc = new BubbleChart(xAxis, yAxis);
+        XYChart.Series&lt;Number, Number&gt; series1 = new XYChart.Series();
+        series1.getData().add(new XYChart.Data(1, 0.1, 0.02));
+        series1.getData().add(new XYChart.Data(2, 0.2, 0.03));
+        series1.getData().add(new XYChart.Data(0.5, -0.4, 0.04));
+        series1.getData().add(new XYChart.Data(0.75, -0.25, 0.05));
+        bc.getData().addAll(series1);
+        Scene scene = new Scene(bc);
+        //// CSS Setting Start ////
+        String css = ColorBubble.class.getResource(""/bubble.css"").toExternalForm();
+        scene.getStylesheets().clear();
+        scene.getStylesheets().add(css.toString());
+        //// CSS Setting End   ////
+        stage.setScene(scene);
+        stage.show();
+        Integer i = 0;
+        for (XYChart.Data&lt;Number, Number&gt; data : series1.getData()) {
+            Text text = new Text(i.toString());
+            text.setFont(Font.font(10));
+            ((StackPane) data.getNode()).getChildren().add(text);
+            i++;
+        }
+    }
+}
+// CSS file content
+/*
+.chart-bubble.series0.data0.default-color0 {
+    -fx-bubble-fill: yellow;
+}
+
+.chart-bubble.series0.data1.default-color0 {
+    -fx-bubble-fill: pink;
+}
+
+.chart-bubble.series0.data2.default-color0 {
+    -fx-bubble-fill: red;
+}
+
+.chart-bubble.series0.data3.default-color0 {
+    -fx-bubble-fill: blue;
+}
+ */
+</code></pre>
+
+<p>The book ""Learn JavaFX 8: Building User Experience and Interfaces with Java 8"" explained how to set the bubble color of each series and each item in Chapter 23 ""Styling the BubbleChart with CSS"". Just follow the instruction, and everything will work. </p>
+",0,48718874,<java><javafx>,"<p>I'm a new user of JavaFX. I'm trying to draw a colored bubble chart like below: <a href=""https://i.stack.imgur.com/cy3lZ.png"" rel=""nofollow noreferrer"">Colored Bubble Chart Example</a></p>
+
+<p>I write the following code which can control both bubble position and size </p>
+
+<pre><code>import javafx.application.Application;
+import javafx.scene.Scene;
+import javafx.scene.chart.BubbleChart;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.XYChart;
+import javafx.scene.layout.StackPane;
+import javafx.scene.text.Text;
+import javafx.stage.Stage;
+public class Scatter extends Application {
+    public static void main(String[] args) {
+        launch(args);
+    }
+    public void start(Stage stage) throws Exception {
+        final NumberAxis xAxis = new NumberAxis();
+        final NumberAxis yAxis = new NumberAxis();
+        final BubbleChart bc = new BubbleChart(xAxis, yAxis);
+        XYChart.Series&lt;Number, Number&gt; series1 = new XYChart.Series();
+        series1.getData().add(new XYChart.Data(1, 0.1, 0.02));
+        series1.getData().add(new XYChart.Data(2, 0.2, 0.03));
+        series1.getData().add(new XYChart.Data(0.5, -0.4, 0.04));
+        series1.getData().add(new XYChart.Data(0.75, -0.25, 0.05));
+        bc.getData().addAll(series1);
+        Scene scene = new Scene(bc);
+        stage.setScene(scene);
+        stage.show();
+        Integer i = 0;
+        for (XYChart.Data&lt;Number, Number&gt; data : series1.getData()) {
+            Text text = new Text(i.toString());
+            ((StackPane) data.getNode()).getChildren().add(text);
+            i++;
+        }
+    }
+}
+</code></pre>
+
+<p>as the following picture
+<a href=""https://i.stack.imgur.com/y7bQD.png"" rel=""nofollow noreferrer"">JavaFX Code Result</a></p>
+
+<p>But I didn't find where I can change the color of each bubble. Can someone help me? Thanks in advance!</p>
+",2,48718874,
+"<p>When you want to use Streams efficiently, you should stop using <code>forEach</code> to basically write the same as the loop, and instead, learn about the <a href=""https://docs.oracle.com/javase/tutorial/collections/streams/index.html"" rel=""nofollow noreferrer"">aggregate operations</a>. See also the comprehensive <a href=""https://docs.oracle.com/javase/8/docs/api/java/util/stream/package-summary.html#package.description"" rel=""nofollow noreferrer"">package documentation</a>.</p>
+
+<p>A thread safe solution may look like</p>
+
+<pre><code>points.stream().forEach(p -&gt; {
+    Cluster min = clusters.stream()
+        .min(Comparator.comparingDouble(c -&gt; determineDistance(p, c))).get();
+    // your original code used the custerNumber to lookup the Cluster in
+    // the list, don't know whether this is this really necessary
+    min = clusters.get(min.clusterNumber - 1);
+
+    // didn't find a better way considering your current code structure
+    synchronized(min) {
+        min.points.add(p);
+    }
+ });
+ List&lt;Cluster&gt; newClusters = clusters.stream()
+    .map(c -&gt; new Cluster(
+       c.points.stream().mapToDouble(p -&gt; p.x).sum()/c.points.size(),
+       c.points.stream().mapToDouble(p -&gt; p.y).sum()/c.points.size(),
+       c.clusterNumber))
+    .collect(Collectors.toList());
+}
+</code></pre>
+
+<p>but you didn’t provide enough context to test this. There are some open questions, e.g. you used the <code>clusterNumber</code> of the <code>Cluster</code> instance to look back into the <code>clusters</code> list; i don’t know whether the <code>clusterNumber</code> represents the actual list index of the <code>Cluster</code> instance we already have, i.e. if this is an unnecessary redundancy, or has a different meaning.</p>
+
+<p>I also don’t know a better solution than synchronizing an the particular <code>Cluster</code> to make the manipulation of its list thread safe (given your current code structure). This is only needed if you decide to use a parallel stream, i.e. <code>points.parallelStream().forEach(p -&gt; …)</code>, other operations are unaffected.</p>
+
+<p>You now have several streams you can try in parallel and sequential to find out where you get a benefit or not. Usually, only the other streams bear a significant benefit, if any…</p>
+",3,48704263,<java><java-8><multiprocessing><java-stream>,"<p>I've got an implementation of the k-means algorithm and I would like to make my process faster by using Java 8 streams and multicore processing.</p>
+
+<p>I've got this code in Java 7:</p>
+
+<pre><code>//Step 2: For each point p:
+//find nearest clusters c
+//assign the point p to the closest cluster c
+for (Point p : points) {
+   double minDst = Double.MAX_VALUE;
+   int minClusterNr = 1;
+   for (Cluster c : clusters) {
+      double tmpDst = determineDistance(p, c);
+      if (tmpDst &lt; minDst) {
+         minDst = tmpDst;
+         minClusterNr = c.clusterNumber;
+      }
+   }
+   clusters.get(minClusterNr - 1).points.add(p);
+}
+//Step 3: For each cluster c
+//find the central point of all points p in c
+//set c to the center point
+ArrayList&lt;Cluster&gt; newClusters = new ArrayList&lt;Cluster&gt;();
+for (Cluster c : clusters) {
+   double newX = 0;
+   double newY = 0;
+   for (Point p : c.points) {
+      newX += p.x;
+      newY += p.y;
+   }
+   newX = newX / c.points.size();
+   newY = newY / c.points.size();
+   newClusters.add(new Cluster(newX, newY, c.clusterNumber));
+}
+</code></pre>
+
+<p>And I would like to use Java 8 with parallel streams to speed up the process.
+I have tried a bit and came up with this solution:</p>
+
+<pre><code>points.stream().forEach(p -&gt; {
+   minDst = Double.MAX_VALUE; //&lt;- THESE ARE GLOBAL VARIABLES NOW
+   minClusterNr = 1;          //&lt;- THESE ARE GLOBAL VARIABLES NOW
+   clusters.stream().forEach(c -&gt; {
+      double tmpDst = determineDistance(p, c);
+      if (tmpDst &lt; minDst) {
+         minDst = tmpDst;
+         minClusterNr = c.clusterNumber;
+      }
+   });
+   clusters.get(minClusterNr - 1).points.add(p);
+});
+ArrayList&lt;Cluster&gt; newClusters = new ArrayList&lt;Cluster&gt;();
+clusters.stream().forEach(c -&gt; {
+   newX = 0;  //&lt;- THESE ARE GLOBAL VARIABLES NOW
+   newY = 0;  //&lt;- THESE ARE GLOBAL VARIABLES NOW
+   c.points.stream().forEach(p -&gt; {
+      newX += p.x;
+      newY += p.y;
+   });
+   newX = newX / c.points.size();
+   newY = newY / c.points.size();
+   newClusters.add(new Cluster(newX, newY, c.clusterNumber));
+});
+</code></pre>
+
+<p>This solution with streams is considerably faster than the one without. And I was wondering if this already uses multicore processing? Why else would it suddenly be almost twice as fast?</p>
+
+<blockquote>
+  <p>without streams : Elapsed time: 202 msec &amp;
+  with streams : Elapsed time: 116 msec</p>
+</blockquote>
+
+<p>Also would it be usefull to use parallelStream in any of these methods to speed them up even more? All it does right now is lead into ArrayOutOfBounce and NullPointer exceptions when I change the stream to stream().parallel().forEach(CODE)</p>
+
+<p>---- EDIT (Added the source code as requested so you try this on your own) ----</p>
+
+<p>--- Clustering.java ---</p>
+
+<pre><code>package algo;
+
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.Random;
+import java.util.function.BiFunction;
+
+import graphics.SimpleColorFun;
+
+/**
+ * An implementation of the k-means-algorithm.
+ * &lt;p&gt;
+ * Step 0: Determine the max size of the canvas
+ * &lt;p&gt;
+ * Step 1: Place clusters at random
+ * &lt;p&gt;
+ * Step 2: For each point p:&lt;br&gt;
+ * find nearest clusters c&lt;br&gt;
+ * assign the point p to the closest cluster c
+ * &lt;p&gt;
+ * Step 3: For each cluster c&lt;br&gt;
+ * find the central point of all points p in c&lt;br&gt;
+ * set c to the center point
+ * &lt;p&gt;
+ * Stop when none of the cluster x,y values change
+ * @author makt
+ *
+ */
+public class Clustering {
+
+   private BiFunction&lt;Integer, Integer, Color&gt; colorFun = new SimpleColorFun();
+   //   private BiFunction&lt;Integer, Integer, Color&gt; colorFun = new GrayScaleColorFun();
+
+   public Random rngGenerator = new Random();
+
+   public double max_x;
+   public double max_y;
+   public double max_xy;
+
+   //---------------------------------
+   //TODO: IS IT GOOD TO HAVE THOUSE VALUES UP HERE?
+   double minDst = Double.MAX_VALUE;
+   int minClusterNr = 1;
+
+   double newX = 0;
+   double newY = 0;
+   //----------------------------------
+
+   public boolean workWithStreams = false;
+
+   public ArrayList&lt;ArrayList&lt;Cluster&gt;&gt; allGeneratedClusterLists = new ArrayList&lt;ArrayList&lt;Cluster&gt;&gt;();
+   public ArrayList&lt;BufferedImage&gt; allGeneratedImages = new ArrayList&lt;BufferedImage&gt;();
+
+   public Clustering(int seed) {
+      rngGenerator.setSeed(seed);
+   }
+
+   public Clustering(Random rng) {
+      rngGenerator = rng;
+   }
+
+   public void setup(int centroidCount, ArrayList&lt;Point&gt; points, int maxIterations) {
+
+      //Step 0: Determine the max size of the canvas
+      determineSize(points);
+
+      ArrayList&lt;Cluster&gt; clusters = new ArrayList&lt;Cluster&gt;();
+      //Step 1: Place clusters at random
+      for (int i = 0; i &lt; centroidCount; i++) {
+         clusters.add(new Cluster(rngGenerator.nextInt((int) max_x), rngGenerator.nextInt((int) max_y), i + 1));
+      }
+
+      int iterations = 0;
+
+      if (workWithStreams) {
+         allGeneratedClusterLists.add(doClusteringWithStreams(points, clusters));
+      } else {
+         allGeneratedClusterLists.add(doClustering(points, clusters));
+      }
+
+      iterations += 1;
+
+      //do until maxIterations is reached or until none of the cluster x and y values change anymore
+      while (iterations &lt; maxIterations) {
+         //Step 2: happens inside doClustering
+         if (workWithStreams) {
+            allGeneratedClusterLists.add(doClusteringWithStreams(points, allGeneratedClusterLists.get(iterations - 1)));
+         } else {
+            allGeneratedClusterLists.add(doClustering(points, allGeneratedClusterLists.get(iterations - 1)));
+         }
+
+         if (!didPointsChangeClusters(allGeneratedClusterLists.get(iterations - 1), allGeneratedClusterLists.get(iterations))) {
+            break;
+         }
+
+         iterations += 1;
+      }
+
+      System.out.println(""Finished with "" + iterations + "" out of "" + maxIterations + "" max iterations"");
+   }
+
+   /**
+    * checks if the cluster x and y values changed compared to the previous x and y values
+    * @param previousCluster
+    * @param currentCluster
+    * @return true if any cluster x or y values changed, false if all of them they are the same
+    */
+   private boolean didPointsChangeClusters(ArrayList&lt;Cluster&gt; previousCluster, ArrayList&lt;Cluster&gt; currentCluster) {
+      for (int i = 0; i &lt; previousCluster.size(); i++) {
+         if (previousCluster.get(i).x != currentCluster.get(i).x || previousCluster.get(i).y != currentCluster.get(i).y) {
+            return true;
+         }
+      }
+      return false;
+   }
+
+   /**
+    * 
+    * @param points - all given points
+    * @param clusters - its point list gets filled in this method
+    * @return a new Clusters Array which has an &lt;b&gt; empty &lt;/b&gt; point list.
+    */
+   private ArrayList&lt;Cluster&gt; doClustering(ArrayList&lt;Point&gt; points, ArrayList&lt;Cluster&gt; clusters) {
+      //Step 2: For each point p:
+      //find nearest clusters c
+      //assign the point p to the closest cluster c
+
+      for (Point p : points) {
+         double minDst = Double.MAX_VALUE;
+         int minClusterNr = 1;
+         for (Cluster c : clusters) {
+            double tmpDst = determineDistance(p, c);
+            if (tmpDst &lt; minDst) {
+               minDst = tmpDst;
+               minClusterNr = c.clusterNumber;
+            }
+         }
+         clusters.get(minClusterNr - 1).points.add(p);
+      }
+
+      //Step 3: For each cluster c
+      //find the central point of all points p in c
+      //set c to the center point
+      ArrayList&lt;Cluster&gt; newClusters = new ArrayList&lt;Cluster&gt;();
+      for (Cluster c : clusters) {
+         double newX = 0;
+         double newY = 0;
+         for (Point p : c.points) {
+            newX += p.x;
+            newY += p.y;
+         }
+         newX = newX / c.points.size();
+         newY = newY / c.points.size();
+         newClusters.add(new Cluster(newX, newY, c.clusterNumber));
+      }
+
+      allGeneratedImages.add(createImage(clusters));
+
+      return newClusters;
+   }
+
+   /**
+    * Does the same as doClustering but about twice as fast!&lt;br&gt;
+    * Uses Java8 streams to achieve this
+    * @param points
+    * @param clusters
+    * @return
+    */
+   private ArrayList&lt;Cluster&gt; doClusteringWithStreams(ArrayList&lt;Point&gt; points, ArrayList&lt;Cluster&gt; clusters) {
+      points.stream().forEach(p -&gt; {
+         minDst = Double.MAX_VALUE;
+         minClusterNr = 1;
+         clusters.stream().forEach(c -&gt; {
+            double tmpDst = determineDistance(p, c);
+            if (tmpDst &lt; minDst) {
+               minDst = tmpDst;
+               minClusterNr = c.clusterNumber;
+            }
+         });
+         clusters.get(minClusterNr - 1).points.add(p);
+      });
+
+      ArrayList&lt;Cluster&gt; newClusters = new ArrayList&lt;Cluster&gt;();
+
+      clusters.stream().forEach(c -&gt; {
+         newX = 0;
+         newY = 0;
+         c.points.stream().forEach(p -&gt; {
+            newX += p.x;
+            newY += p.y;
+         });
+         newX = newX / c.points.size();
+         newY = newY / c.points.size();
+         newClusters.add(new Cluster(newX, newY, c.clusterNumber));
+      });
+
+      allGeneratedImages.add(createImage(clusters));
+
+      return newClusters;
+   }
+
+   //draw all centers from clusters
+   //draw all points
+   //color points according to cluster value
+   private BufferedImage createImage(ArrayList&lt;Cluster&gt; clusters) {
+      //add 10% of the max size left and right to the image bounds
+      //BufferedImage bi = new BufferedImage((int) (max_xy * 1.05), (int) (max_xy * 1.05), BufferedImage.TYPE_BYTE_INDEXED);
+      BufferedImage bi = new BufferedImage((int) (max_xy * 1.05), (int) (max_xy * 1.05), BufferedImage.TYPE_INT_ARGB); // support 32-bit RGBA values
+      Graphics2D g2d = bi.createGraphics();
+
+      int numClusters = clusters.size();
+      for (Cluster c : clusters) {
+         //color points according to cluster value
+         Color col = colorFun.apply(c.clusterNumber, numClusters);
+         //draw all points
+         g2d.setColor(col);
+         for (Point p : c.points) {
+            g2d.fillRect((int) p.x, (int) p.y, (int) (max_xy * 0.02), (int) (max_xy * 0.02));
+         }
+         //draw all centers from clusters
+         g2d.setColor(new Color(160, 80, 80, 200)); // use RGBA: transparency=200
+         g2d.fillOval((int) c.x, (int) c.y, (int) (max_xy * 0.03), (int) (max_xy * 0.03));
+      }
+
+      return bi;
+   }
+
+   /**
+    * Calculates the euclidean distance without square root
+    * @param p
+    * @param c
+    * @return
+    */
+   private double determineDistance(Point p, Cluster c) {
+      //math.sqrt not needed because the relative distance does not change by applying the square root
+      //        return Math.sqrt(Math.pow((p.x - c.x), 2)+Math.pow((p.y - c.y),2));
+
+      return Math.pow((p.x - c.x), 2) + Math.pow((p.y - c.y), 2);
+   }
+
+   //TODO: What if coordinates can also be negative?
+   private void determineSize(ArrayList&lt;Point&gt; points) {
+      for (Point p : points) {
+         if (p.x &gt; max_x) {
+            max_x = p.x;
+         }
+         if (p.y &gt; max_y) {
+            max_y = p.y;
+         }
+      }
+      if (max_x &gt; max_y) {
+         max_xy = max_x;
+      } else {
+         max_xy = max_y;
+      }
+   }
+
+}
+</code></pre>
+
+<p>--- Point.java ---</p>
+
+<pre><code>package algo;
+
+public class Point {
+
+    public double x;
+    public double y;
+
+    public Point(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    public Point(double x, double y) {
+        this.x = x;
+        this.y = y;
+    }
+
+
+}
+</code></pre>
+
+<p>--- Cluster.java ---</p>
+
+<pre><code>package algo;
+
+import java.util.ArrayList;
+
+public class Cluster {
+
+    public double x;
+    public double y;
+
+    public int clusterNumber;
+
+    public ArrayList&lt;Point&gt; points = new ArrayList&lt;Point&gt;();
+
+    public Cluster(double x, double y, int clusterNumber) {
+        this.x = x;
+        this.y = y;
+        this.clusterNumber = clusterNumber;
+    }
+
+}
+</code></pre>
+
+<p>--- SimpleColorFun.java ---</p>
+
+<pre><code>package graphics;
+
+import java.awt.Color;
+import java.util.function.BiFunction;
+
+/**
+ * Simple function for selection a color for a specific cluster identified with an integer-ID.
+ * 
+ * @author makl, hese
+ */
+public class SimpleColorFun implements BiFunction&lt;Integer, Integer, Color&gt; {
+
+   /**
+    * Selects a color value.
+    * @param n current index
+    * @param numCol number of color-values possible
+    */
+   @Override
+   public Color apply(Integer n, Integer numCol) {
+      Color col = Color.BLACK;
+      //color points according to cluster value
+      switch (n) {
+         case 1:
+            col = Color.RED;
+            break;
+         case 2:
+            col = Color.GREEN;
+            break;
+         case 3:
+            col = Color.BLUE;
+            break;
+         case 4:
+            col = Color.ORANGE;
+            break;
+         case 5:
+            col = Color.MAGENTA;
+            break;
+         case 6:
+            col = Color.YELLOW;
+            break;
+         case 7:
+            col = Color.CYAN;
+            break;
+         case 8:
+            col = Color.PINK;
+            break;
+         case 9:
+            col = Color.LIGHT_GRAY;
+            break;
+         default:
+            break;
+      }
+      return col;
+   }
+
+}
+</code></pre>
+
+<p>--- Main.java ---  (REPLACE THE Stopwatch with some time logging mechanismus - I get this from our working environment)</p>
+
+<pre><code>package main;
+
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Random;
+import java.util.concurrent.TimeUnit;
+
+import javax.imageio.ImageIO;
+
+import algo.Clustering;
+import algo.Point;
+import eu.lbase.common.util.Stopwatch;
+// import persistence.DataHandler;
+
+public class Main {
+
+   private static final String OUTPUT_DIR = (new File(""./output/withoutStream"")).getAbsolutePath() + File.separator;
+   private static final String OUTPUT_DIR_2 = (new File(""./output/withStream"")).getAbsolutePath() + File.separator;
+
+   public static void main(String[] args) {
+      Random rng = new Random();
+      int numPoints = 300;
+      int seed = 2;
+
+      ArrayList&lt;Point&gt; points = new ArrayList&lt;Point&gt;();
+      rng.setSeed(rng.nextInt());
+      for (int i = 0; i &lt; numPoints; i++) {
+         points.add(new Point(rng.nextInt(1000), rng.nextInt(1000)));
+      }
+
+      Stopwatch stw = Stopwatch.create(TimeUnit.MILLISECONDS);
+      {
+         // Stopwatch start
+         System.out.println(""--- Started without streams ---"");
+         stw.start();
+
+         Clustering algo = new Clustering(seed);
+         algo.setup(8, points, 25);
+
+         // Stopwatch stop
+         stw.stop();
+         System.out.println(""--- Finished without streams ---"");
+         System.out.printf(""Elapsed time: %d msec%n%n"", stw.getElapsed());
+
+         System.out.printf(""Writing images to '%s' ...%n"", OUTPUT_DIR);
+
+         deleteOldFiles(new File(OUTPUT_DIR));
+         makeImages(OUTPUT_DIR, algo);
+
+         System.out.println(""Finished writing.\n"");
+      }
+
+      {
+         System.out.println(""--- Started with streams ---"");
+         stw.start();
+
+         Clustering algo = new Clustering(seed);
+         algo.workWithStreams = true;
+         algo.setup(8, points, 25);
+
+         // Stopwatch stop
+         stw.stop();
+         System.out.println(""--- Finished with streams ---"");
+         System.out.printf(""Elapsed time: %d msec%n%n"", stw.getElapsed());
+
+         System.out.printf(""Writing images to '%s' ...%n"", OUTPUT_DIR_2);
+
+         deleteOldFiles(new File(OUTPUT_DIR_2));
+         makeImages(OUTPUT_DIR_2, algo);
+
+         System.out.println(""Finished writing.\n"");
+      }
+   }
+
+   /**
+    * creates one image for each iteration in the given directory
+    * @param algo
+    */
+   private static void makeImages(String dir, Clustering algo) {
+      int i = 1;
+      for (BufferedImage img : algo.allGeneratedImages) {
+         try {
+            String filename = String.format(""%03d.png"", i);
+            ImageIO.write(img, ""png"", new File(dir + filename));
+         } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+         }
+         i++;
+      }
+   }
+
+   /**
+    * deletes old files from the target directory&lt;br&gt;
+    * Does &lt;b&gt;not&lt;/b&gt; delete directories!
+    * @param dir - directory to delete files from
+    * @return
+    */
+   private static boolean deleteOldFiles(File file) {
+      File[] allContents = file.listFiles();
+      if (allContents != null) {
+         for (File f : allContents) {
+            deleteOldFiles(f);
+         }
+      }
+      if (!file.isDirectory()) {
+         return file.delete();
+      }
+      return false;
+   }
+
+}
+</code></pre>
+",2,48704263,"48718874, 48722197"
+"<pre><code>yourList.stream()
+        .map(x -&gt; x.split("","", 2))
+        .collect(Collectors.groupingBy(
+            x -&gt; x[0],
+            Collectors.mapping(x -&gt; x[1], Collectors.toList())
+
+));
+</code></pre>
+",2,48703877,<java><collections><java-8><hashmap>,"<p>I have a list of comma separated strings -</p>
+
+<pre><code>List: format = &lt;unique id, label&gt;
+----- values -----
+ab123,X
+cd123,Y
+ab123,Y
+cd123,Z
+------------------
+</code></pre>
+
+<p>I want to convert this list to <code>Map&lt;String, List&lt;String&gt;&gt;</code> using java 8 where key would be the unique id and value would be the list of labels (<code>Map&lt;unique-id, List&lt;label&gt;&gt;).</code></p>
+
+<p>Example -</p>
+
+<pre><code>Map[
+ab123=List[X, Y],
+cd123=List[Y, Z]
+]
+</code></pre>
+
+<p>Could you please help me here so that I could implement this using java 8.</p>
+
+<p>Also instead of Map, if I want to use dto class -</p>
+
+<pre><code>Class A {
+ private String id;
+ private List&lt;String&gt; labelList;
+ // Getters and Setters methods
+}
+</code></pre>
+
+<p>and I expect to create a list of <code>class A</code>, for example -</p>
+
+<pre><code>List[
+A [id=""ab123"", labelList = List[X, Y],
+A [id=""cd123"", labelList = List[Y, Z]
+]
+</code></pre>
+
+<p>How could I get that?</p>
+",3,48703877,
+"<p>With Java 8 stream api, it's pretty simple to do what you attempt to do. I gonna explain it to you in two steps.</p>
+
+<h2>First step: Convert all to a map.</h2>
+
+<pre><code>List&lt;String&gt; list = new ArrayList&lt;&gt;();
+list.add(""ab123,X"");
+list.add(""cd123,Y"");
+list.add(""ab123,Y"");
+list.add(""cd123,Z"");
+
+Map&lt;String, List&lt;String&gt;&gt; result = list.stream()
+    .map(e -&gt; e.split("",""))
+    .collect(Collectors.groupingBy(
+        e -&gt; e[0], 
+        Collectors.mapping(e -&gt; e[1], Collectors.toList())
+    ));
+
+// print the result
+result.entrySet().stream().forEach(System.out::println);
+</code></pre>
+
+<p>Output:</p>
+
+<pre><code>cd123=[Y, Z]
+ab123=[X, Y]
+</code></pre>
+
+<hr>
+
+<p>Step by step:</p>
+
+<ul>
+<li><code>list.stream()</code> transforms your list into stream.</li>
+<li><code>map(e -&gt; e.split("","")</code> transform your list of string into a list of two values array [key, value].</li>
+<li><code>collect(...)</code> group your array elements with the same key.</li>
+</ul>
+
+<h2>Second step: Convert the map to a DTO</h2>
+
+<pre><code>List&lt;String&gt; list = new ArrayList&lt;&gt;();
+list.add(""ab123,X"");
+list.add(""cd123,Y"");
+list.add(""ab123,Y"");
+list.add(""cd123,Z"");
+
+List&lt;MyAwesomeDto&gt; result = list.stream()
+    .map(e -&gt; e.split("",""))
+    .collect(Collectors.groupingBy(
+        e -&gt; e[0],
+        Collectors.mapping(e -&gt; e[1], Collectors.toList())
+    ))
+    .entrySet()
+    .stream()
+    .map(e -&gt; new MyAwesomeDto(e.getKey(), e.getValue()))
+    .collect(Collectors.toList());
+
+// print the result
+result.stream().forEach(System.out::println);
+</code></pre>
+
+<p>We just add a step to map all map <code>Entry</code> to DTO.</p>
+
+<p>Hope this gonna help you.</p>
+",1,48703877,<java><collections><java-8><hashmap>,"<p>I have a list of comma separated strings -</p>
+
+<pre><code>List: format = &lt;unique id, label&gt;
+----- values -----
+ab123,X
+cd123,Y
+ab123,Y
+cd123,Z
+------------------
+</code></pre>
+
+<p>I want to convert this list to <code>Map&lt;String, List&lt;String&gt;&gt;</code> using java 8 where key would be the unique id and value would be the list of labels (<code>Map&lt;unique-id, List&lt;label&gt;&gt;).</code></p>
+
+<p>Example -</p>
+
+<pre><code>Map[
+ab123=List[X, Y],
+cd123=List[Y, Z]
+]
+</code></pre>
+
+<p>Could you please help me here so that I could implement this using java 8.</p>
+
+<p>Also instead of Map, if I want to use dto class -</p>
+
+<pre><code>Class A {
+ private String id;
+ private List&lt;String&gt; labelList;
+ // Getters and Setters methods
+}
+</code></pre>
+
+<p>and I expect to create a list of <code>class A</code>, for example -</p>
+
+<pre><code>List[
+A [id=""ab123"", labelList = List[X, Y],
+A [id=""cd123"", labelList = List[Y, Z]
+]
+</code></pre>
+
+<p>How could I get that?</p>
+",3,48703877,
+"<p>Using regex matching to filter all string that don't match given pattern:</p>
+
+<pre><code>import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+public class ListToMapExample {
+
+    public static void main(String[] args) {
+        final List&lt;String&gt; list = Arrays.asList(""ab123,X"", ""cd123,Y"", ""ab123,Y"", ""cd123,Z"", ""incorrect string"", """", ""a"");
+        final Pattern pattern = Pattern.compile(""^([^,]+),(.*)$"");
+
+        final Map&lt;String, List&lt;String&gt;&gt; map = list.stream()
+                .map(pattern::matcher)
+                .filter(Matcher::matches)
+                .collect(Collectors.groupingBy(
+                        matcher -&gt; matcher.group(1), 
+                        Collectors.mapping(
+                                matcher -&gt; matcher.group(2), 
+                                Collectors.toList()
+                        ))
+                );
+
+        System.out.println(map);
+    }
+}
+</code></pre>
+
+<p>Output:</p>
+
+<pre><code>{cd123=[Y, Z], ab123=[X, Y]}
+</code></pre>
+",0,48703877,<java><collections><java-8><hashmap>,"<p>I have a list of comma separated strings -</p>
+
+<pre><code>List: format = &lt;unique id, label&gt;
+----- values -----
+ab123,X
+cd123,Y
+ab123,Y
+cd123,Z
+------------------
+</code></pre>
+
+<p>I want to convert this list to <code>Map&lt;String, List&lt;String&gt;&gt;</code> using java 8 where key would be the unique id and value would be the list of labels (<code>Map&lt;unique-id, List&lt;label&gt;&gt;).</code></p>
+
+<p>Example -</p>
+
+<pre><code>Map[
+ab123=List[X, Y],
+cd123=List[Y, Z]
+]
+</code></pre>
+
+<p>Could you please help me here so that I could implement this using java 8.</p>
+
+<p>Also instead of Map, if I want to use dto class -</p>
+
+<pre><code>Class A {
+ private String id;
+ private List&lt;String&gt; labelList;
+ // Getters and Setters methods
+}
+</code></pre>
+
+<p>and I expect to create a list of <code>class A</code>, for example -</p>
+
+<pre><code>List[
+A [id=""ab123"", labelList = List[X, Y],
+A [id=""cd123"", labelList = List[Y, Z]
+]
+</code></pre>
+
+<p>How could I get that?</p>
+",3,48703877,
+"<p>You could do this:</p>
+
+<pre><code>String input = ""A cat sat on a mat and wore a hat A cat sat on a mat and wore a hat"";
+
+Set&lt;String&gt; toFilter = Set.of(""cat"", ""mat""); // Java 9's set.of, for brievety.
+Set&lt;String&gt; seen = new HashSet&lt;&gt;();
+
+String result = Arrays.stream(input.split("" ""))
+        .filter(s -&gt; !toFilter.contains(s) || seen.add(s))
+        .collect(Collectors.joining("" ""));
+
+System.out.println(result); // A cat sat on a mat and wore a hat A sat on a and wore a hat
+</code></pre>
+
+<p>This takes advantage of the fact that <code>seen.add</code> will return false if the word was already in the set.</p>
+
+<hr>
+
+<p>As a response to some of the comments, worrying about the order of the words not being preserved:</p>
+
+<p>The documentation for <a href=""https://docs.oracle.com/javase/9/docs/api/java/util/Arrays.html#stream-T:A-"" rel=""nofollow noreferrer""><code>Arrays.stream</code></a> doesn't explicitly say the returned stream is ordered, but it does mention:</p>
+
+<blockquote>
+  <p>Returns a sequential Stream with the specified array as its source.</p>
+</blockquote>
+
+<p>An array has a defined ordering to it, i.e. it is ordered, so I'd say it's safe to read this as that the returned stream is also ordered.</p>
+
+<p>Another way you can get an ordered stream is by using <code>Arrays.spliterator</code> and wrapping the result in a stream yourself (since the spliterator will report <code>ORDERED</code> by <a href=""https://docs.oracle.com/javase/8/docs/api/java/util/Arrays.html#spliterator-T:A-"" rel=""nofollow noreferrer"">documentation</a>):</p>
+
+<pre><code>StreamSupport.stream(Arrays.spliterator(input.split("" "")), false)
+</code></pre>
+
+<p>But currently, <code>Arrays.stream</code> does this too.</p>
+
+<hr>
+
+<p>Otherwise, there is always the for-loop fall back:</p>
+
+<pre><code>String[] tokens = input.split("" "");
+StringJoiner joiner = new StringJoiner("" "");
+for(String s : tokens) {
+    if(!toFilter.contains(s) || seen.add(s)) {
+        joiner.add(s);
+    }
+}
+
+String result = joiner.toString();
+</code></pre>
+",4,48702999,<java><regex><string><java-8>,"<p>What's an elegant way in Java 8 to remove <strong>certain specific</strong> duplicate words from a string such that:</p>
+
+<p>With a list of non-duplicate words: <strong>[cat, mat]</strong></p>
+
+<p>Given a String: <em>""A cat sat on a mat and wore a hat A <strong>cat</strong> sat on a <strong>mat</strong> and wore a hat""</em></p>
+
+<p>The result should be: <em>""A cat sat on a mat and wore a hat A sat on a and wore a hat""</em></p>
+
+<p><strong>NOTE:</strong> Its the first occurrence we want to preserve.</p>
+",3,48702999,
+"<p>Updated <a href=""https://regex101.com/r/AMMx4H/2"" rel=""nofollow noreferrer"">Here</a> an example using a positive lookahead, the words removed are the firsts to occur</p>
+
+<pre><code>\b(cat|mat)\b(?=.*\b\1\b)
+</code></pre>
+
+<p>in java</p>
+
+<pre><code>String input = ""A cat sat on a mat and wore a hat A cat sat on a mat and wore a hat"";
+input = input.replaceAll(""\\b(cat|mat)\\b(?=.*\\b\\1\\b)"", """");
+System.out.println( input );
+</code></pre>
+",3,48702999,<java><regex><string><java-8>,"<p>What's an elegant way in Java 8 to remove <strong>certain specific</strong> duplicate words from a string such that:</p>
+
+<p>With a list of non-duplicate words: <strong>[cat, mat]</strong></p>
+
+<p>Given a String: <em>""A cat sat on a mat and wore a hat A <strong>cat</strong> sat on a <strong>mat</strong> and wore a hat""</em></p>
+
+<p>The result should be: <em>""A cat sat on a mat and wore a hat A sat on a and wore a hat""</em></p>
+
+<p><strong>NOTE:</strong> Its the first occurrence we want to preserve.</p>
+",3,48702999,
+"<p>For a more basic solution than the others;</p>
+
+<pre><code>String input = ""A cat sat on a mat and wore a hat A cat sat on a mat and wore a hat"";
+String[] list = {""cat"", ""mat""};
+    for(String word : list){
+        int index = input.indexOf(word) + word.length();
+        input = input.substring(0, index) + input.substring(index).replace(word, """");
+    }
+</code></pre>
+
+<p>Or by utilising the 'limit' parameter on <code>String.split()</code> you could replace the loop above with the following;</p>
+
+<pre><code>    for(String word : list){
+        String[] split = input.split(word, 2);
+        input = split[0] + word + split[1].replace(word, """");
+    }
+</code></pre>
+
+<p>Both of these output <code>A cat sat on a mat and wore a hat A  sat on a  and wore a hat</code> but if you wanted to remove the double space you could easily call <code>input.replaceAll("" {2,}"", "" "");</code> before returning the value to remove any additional spaces.</p>
+",1,48702999,<java><regex><string><java-8>,"<p>What's an elegant way in Java 8 to remove <strong>certain specific</strong> duplicate words from a string such that:</p>
+
+<p>With a list of non-duplicate words: <strong>[cat, mat]</strong></p>
+
+<p>Given a String: <em>""A cat sat on a mat and wore a hat A <strong>cat</strong> sat on a <strong>mat</strong> and wore a hat""</em></p>
+
+<p>The result should be: <em>""A cat sat on a mat and wore a hat A sat on a and wore a hat""</em></p>
+
+<p><strong>NOTE:</strong> Its the first occurrence we want to preserve.</p>
+",3,48702999,
+"<p>Seems like you are on the UI Thread, therefore the text is not updating as you are on the same thread as the rest of your code.</p>
+
+<p>You should to use <a href=""https://docs.oracle.com/javase/8/javafx/api/javafx/application/Platform.html#runLater-java.lang.Runnable-"" rel=""nofollow noreferrer"">Platform.runLater</a> :</p>
+
+<pre><code>FutureTask&lt;Void&gt; updateUITask = new FutureTask(() -&gt; {
+    lblStatus.setText(""Logging out.."");
+}
+
+Platform.runLater(updateUITask );
+</code></pre>
+",2,48702200,<java><javafx><delay><fxml>,"<p>What could be the problem with the snippet below?</p>
+
+<pre><code>    @FXML 
+    private Button btnLogOut;
+    @FXML
+    private Label lblStatus;
+
+    @FXML 
+    private void btnLogOut_Click() throws InterruptedException {
+        lblStatus.setText(""Logging out..""); // Doesn't work..?
+        Thread.sleep(1000);
+        System.exit(0);
+    }
+</code></pre>
+
+<p>Thanks in advance for the help.</p>
+",3,48702200,
+"<p>This below is what worked for me:</p>
+
+<pre><code>@FXML 
+private Button btnLogOut;
+@FXML
+private Label lblStatus;
+
+@FXML 
+private void btnLogOut_Click() throws InterruptedException  {
+     lblStatus.setText(""Logging out.."");
+     Thread.sleep(100);
+
+    Platform.runLater(new Runnable() {
+        @Override
+        public void run() {
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException ex) {
+                Logger.getLogger(FXMLMainController.class.getName()).log(Level.SEVERE, null, ex);
+            }
+            System.exit(0);
+        }
+    });
+}
+</code></pre>
+",0,48702200,<java><javafx><delay><fxml>,"<p>What could be the problem with the snippet below?</p>
+
+<pre><code>    @FXML 
+    private Button btnLogOut;
+    @FXML
+    private Label lblStatus;
+
+    @FXML 
+    private void btnLogOut_Click() throws InterruptedException {
+        lblStatus.setText(""Logging out..""); // Doesn't work..?
+        Thread.sleep(1000);
+        System.exit(0);
+    }
+</code></pre>
+
+<p>Thanks in advance for the help.</p>
+",3,48702200,
+"<p>By using <code>Thread.sleep</code> on the application thread you prevent the UI from updating. To prevent this you need to run the code for waiting/shutting down on a different thread and allow the application thread to continue doing it's job:</p>
+
+<pre><code>@FXML 
+private void btnLogOut_Click() {
+    // update ui
+    lblStatus.setText(""Logging out.."");
+
+    // delay &amp; exit on other thread
+    new Thread(() -&gt; {
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException ex) {
+        }
+        System.exit(0);
+    }).start();
+}
+</code></pre>
+
+<p>You may want to consider using <a href=""https://docs.oracle.com/javase/9/docs/api/javafx/application/Platform.html#exit--"" rel=""nofollow noreferrer""><code>Platform.exit()</code></a> instead of <code>System.exit</code> though.</p>
+",2,48702200,<java><javafx><delay><fxml>,"<p>What could be the problem with the snippet below?</p>
+
+<pre><code>    @FXML 
+    private Button btnLogOut;
+    @FXML
+    private Label lblStatus;
+
+    @FXML 
+    private void btnLogOut_Click() throws InterruptedException {
+        lblStatus.setText(""Logging out..""); // Doesn't work..?
+        Thread.sleep(1000);
+        System.exit(0);
+    }
+</code></pre>
+
+<p>Thanks in advance for the help.</p>
+",3,48702200,
+"<p>Judging from your description you are looking for <code>allMatch</code> rather than <code>anyMatch</code>.</p>
+
+<p>Currently you get all the sets which contain at least one non-True value. What you seem to want is having only sets that consist of non-True values only.</p>
+
+<p>If you are rather looking for filtering out the negative values from all sets, you should use a mapping, not just filter, on the Map. In the mapping you could create copies of the sets with True values excluded.</p>
+",0,48698567,<java><java-8><hashmap><java-stream>,"<p>This is class Item.</p>
+
+<pre><code>public class Item {
+    String id;
+    String name;
+    Integer value;
+    Boolean status;
+}
+</code></pre>
+
+<p>I have a Map(String, Set(Item)). I want to write a method that returns a Map(String, Set(Item)) such that only Items with status = false or status = null are present in the resulting map. I don't want a set-wide operation. I want the resulting subsets to only contain those Item that have status == Boolean.FALSE OR status == null. I don't want the entire set to get included or excluded. I only want those individual items included or excluded as per the status value.</p>
+
+<p>Here's what I've tried so far. </p>
+
+<pre><code>public Map&lt;String,Set&lt;Item&gt;&gt; filterByStatus(Map&lt;String, Set&lt;Item&gt;&gt; changes) {
+    return changes.entrySet()
+                  .stream()
+                  .filter(p -&gt; p.getValue()
+                                .stream()
+                                .anyMatch(item -&gt; BooleanUtils.isNotTrue(item.isStatus())))
+                  .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+}
+</code></pre>
+
+<p>It didn't work! I get back the same results as I would if I didn't call filterByStatus. </p>
+
+<p><strong>UPDATE</strong></p>
+
+<pre><code>public Map&lt;String,Set&lt;Item&gt;&gt; filterByStatus(Map&lt;String, Set&lt;Item&gt;&gt; changes) {
+    return changes.entrySet()
+                  .stream()
+                  .map(p -&gt; p.getValue()
+                                .stream()
+                                .filter(item -&gt; BooleanUtils.isNotTrue(item.isStatus())))
+                  .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+}
+</code></pre>
+
+<p>Result: There's an error in the collect(Collectors.toMap()) line saying Non-static method cannot be referenced from static context. </p>
+",4,48698567,48702200
+"<pre><code>public Map&lt;String, Set&lt;Item&gt;&gt; filterByStatus(Map&lt;String, Set&lt;Item&gt;&gt; changes) {
+    return changes.entrySet()
+            .stream()
+            .collect(Collectors.toMap(Map.Entry::getKey, entry -&gt;
+                entry.getValue()
+                    .stream()
+                    .filter(item -&gt; item.status == null || item.status == Boolean.FALSE)
+                    .collect(Collectors.toSet())
+            ));
+}
+</code></pre>
+",3,48698567,<java><java-8><hashmap><java-stream>,"<p>This is class Item.</p>
+
+<pre><code>public class Item {
+    String id;
+    String name;
+    Integer value;
+    Boolean status;
+}
+</code></pre>
+
+<p>I have a Map(String, Set(Item)). I want to write a method that returns a Map(String, Set(Item)) such that only Items with status = false or status = null are present in the resulting map. I don't want a set-wide operation. I want the resulting subsets to only contain those Item that have status == Boolean.FALSE OR status == null. I don't want the entire set to get included or excluded. I only want those individual items included or excluded as per the status value.</p>
+
+<p>Here's what I've tried so far. </p>
+
+<pre><code>public Map&lt;String,Set&lt;Item&gt;&gt; filterByStatus(Map&lt;String, Set&lt;Item&gt;&gt; changes) {
+    return changes.entrySet()
+                  .stream()
+                  .filter(p -&gt; p.getValue()
+                                .stream()
+                                .anyMatch(item -&gt; BooleanUtils.isNotTrue(item.isStatus())))
+                  .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+}
+</code></pre>
+
+<p>It didn't work! I get back the same results as I would if I didn't call filterByStatus. </p>
+
+<p><strong>UPDATE</strong></p>
+
+<pre><code>public Map&lt;String,Set&lt;Item&gt;&gt; filterByStatus(Map&lt;String, Set&lt;Item&gt;&gt; changes) {
+    return changes.entrySet()
+                  .stream()
+                  .map(p -&gt; p.getValue()
+                                .stream()
+                                .filter(item -&gt; BooleanUtils.isNotTrue(item.isStatus())))
+                  .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+}
+</code></pre>
+
+<p>Result: There's an error in the collect(Collectors.toMap()) line saying Non-static method cannot be referenced from static context. </p>
+",4,48698567,48702200
+"<p>This avoid include in new Map entrys with 0 items.</p>
+
+<pre><code>private Map&lt;String,Set&lt;Item&gt;&gt; filterByStatus(Map&lt;String, Set&lt;Item&gt;&gt; changes) {
+    return changes.entrySet()
+            .stream()
+            .filter(entry -&gt; entry.getValue()
+                    .stream()
+                    .anyMatch(item -&gt; item.status == null || item.status == false))
+            .collect(Collectors.toMap(Map.Entry::getKey, entry -&gt; entry.getValue()
+                    .stream()
+                    .filter(item -&gt; item.status == null || item.status == false)
+                    .collect(Collectors.toSet()))
+            );
+}
+</code></pre>
+",0,48698567,<java><java-8><hashmap><java-stream>,"<p>This is class Item.</p>
+
+<pre><code>public class Item {
+    String id;
+    String name;
+    Integer value;
+    Boolean status;
+}
+</code></pre>
+
+<p>I have a Map(String, Set(Item)). I want to write a method that returns a Map(String, Set(Item)) such that only Items with status = false or status = null are present in the resulting map. I don't want a set-wide operation. I want the resulting subsets to only contain those Item that have status == Boolean.FALSE OR status == null. I don't want the entire set to get included or excluded. I only want those individual items included or excluded as per the status value.</p>
+
+<p>Here's what I've tried so far. </p>
+
+<pre><code>public Map&lt;String,Set&lt;Item&gt;&gt; filterByStatus(Map&lt;String, Set&lt;Item&gt;&gt; changes) {
+    return changes.entrySet()
+                  .stream()
+                  .filter(p -&gt; p.getValue()
+                                .stream()
+                                .anyMatch(item -&gt; BooleanUtils.isNotTrue(item.isStatus())))
+                  .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+}
+</code></pre>
+
+<p>It didn't work! I get back the same results as I would if I didn't call filterByStatus. </p>
+
+<p><strong>UPDATE</strong></p>
+
+<pre><code>public Map&lt;String,Set&lt;Item&gt;&gt; filterByStatus(Map&lt;String, Set&lt;Item&gt;&gt; changes) {
+    return changes.entrySet()
+                  .stream()
+                  .map(p -&gt; p.getValue()
+                                .stream()
+                                .filter(item -&gt; BooleanUtils.isNotTrue(item.isStatus())))
+                  .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+}
+</code></pre>
+
+<p>Result: There's an error in the collect(Collectors.toMap()) line saying Non-static method cannot be referenced from static context. </p>
+",4,48698567,48702200
+"<p>Alternatively to a Stream solution, you may use</p>
+
+<pre><code>public Map&lt;String, Set&lt;Item&gt;&gt; filterByStatus(Map&lt;String, Set&lt;Item&gt;&gt; changes) {
+    Map&lt;String, Set&lt;Item&gt;&gt; result = new HashMap&lt;&gt;(changes);
+    result.replaceAll((key, set) -&gt; {
+        set = new HashSet&lt;&gt;(set);
+        set.removeIf(item -&gt; Boolean.TRUE.equals(item.status));
+        return set;
+    });
+    // if you want to remove empty sets afterwards:
+    result.values().removeIf(Set::isEmpty);
+    return result;
+}
+</code></pre>
+
+<p>You could even do the operation in-place if the sets are mutable and you don’t need the old state anymore:</p>
+
+<pre><code>changes.values().forEach(set -&gt; set.removeIf(item -&gt; Boolean.TRUE.equals(item.status)));
+// if you want to remove empty sets afterwards (and the map is mutable):
+changes.values().removeIf(Set::isEmpty);
+</code></pre>
+
+<p>you could even remove these items, followed by removing the set only if they became empty due to the removal, in one statement:</p>
+
+<pre><code>changes.values().removeIf(set -&gt;
+    set.removeIf(item -&gt; Boolean.TRUE.equals(item.status)) &amp;&amp; set.isEmpty());
+</code></pre>
+",2,48698567,<java><java-8><hashmap><java-stream>,"<p>This is class Item.</p>
+
+<pre><code>public class Item {
+    String id;
+    String name;
+    Integer value;
+    Boolean status;
+}
+</code></pre>
+
+<p>I have a Map(String, Set(Item)). I want to write a method that returns a Map(String, Set(Item)) such that only Items with status = false or status = null are present in the resulting map. I don't want a set-wide operation. I want the resulting subsets to only contain those Item that have status == Boolean.FALSE OR status == null. I don't want the entire set to get included or excluded. I only want those individual items included or excluded as per the status value.</p>
+
+<p>Here's what I've tried so far. </p>
+
+<pre><code>public Map&lt;String,Set&lt;Item&gt;&gt; filterByStatus(Map&lt;String, Set&lt;Item&gt;&gt; changes) {
+    return changes.entrySet()
+                  .stream()
+                  .filter(p -&gt; p.getValue()
+                                .stream()
+                                .anyMatch(item -&gt; BooleanUtils.isNotTrue(item.isStatus())))
+                  .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+}
+</code></pre>
+
+<p>It didn't work! I get back the same results as I would if I didn't call filterByStatus. </p>
+
+<p><strong>UPDATE</strong></p>
+
+<pre><code>public Map&lt;String,Set&lt;Item&gt;&gt; filterByStatus(Map&lt;String, Set&lt;Item&gt;&gt; changes) {
+    return changes.entrySet()
+                  .stream()
+                  .map(p -&gt; p.getValue()
+                                .stream()
+                                .filter(item -&gt; BooleanUtils.isNotTrue(item.isStatus())))
+                  .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+}
+</code></pre>
+
+<p>Result: There's an error in the collect(Collectors.toMap()) line saying Non-static method cannot be referenced from static context. </p>
+",4,48698567,48702200
+"<p>I suppose one way would be:</p>
+
+<pre><code> persons
+   .stream()          
+   .collect(Collectors.collectingAndThen(Collectors.groupingBy(
+           Person::getName),
+           map -&gt; {
+               return map.entrySet()
+                         .stream()
+                         .map(en -&gt; new GroupedPerson(en.getKey(), en.getValue()))
+                         .collect(Collectors.toList());
+}));
+</code></pre>
+
+<p>Or, you could use <code>toMap</code>:</p>
+
+<pre><code>persons  
+   .stream()
+   .collect(Collectors.toMap(
+            Person::getName,
+            x -&gt; {
+                  List&lt;Person&gt; l = new ArrayList&lt;&gt;();
+                  l.add(x);
+                  return new GroupedPerson(x.getName(), l);
+            },
+            (left, right) -&gt; {
+                 left.getAs().addAll(right.getAs());
+                 return left;
+            }))
+   .values();
+</code></pre>
+",2,48693460,<java-8><java-stream><collectors>,"<p>I have a list of <code>Persons</code> which have some duplicate names.</p>
+
+<pre><code>class Person {
+  String name;
+}
+</code></pre>
+
+<p>I want to convert it to the list of <code>GroupedPersons</code> which contain the common name and the list of all Persons who have that name.</p>
+
+<pre><code>class GroupedPerson {
+  String name;
+  List&lt;A&gt; as;
+}
+</code></pre>
+
+<p>Is it possible to do this with one collector and without any intermediate mapping or extra classes?</p>
+",3,48693460,
+"<p>Yes, you can do that. Here is a way to do it:</p>
+
+<pre><code>import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
+public class GroupedStream {
+
+    public static void main(String[] args) {
+        List&lt;GroupedPerson&gt; groupedPersons = Arrays.asList(""john harry john harry sam jordon bill steve bill"".split("" ""))
+            .stream()
+            .map(name -&gt; new Person(name))
+            .map(person -&gt; new Object[] {person.name, new ArrayList&lt;&gt;()})
+            .collect(Collectors.toMap(tuple-&gt; (String) tuple[0], tuple -&gt; (List&lt;Person&gt;) tuple[1] ))
+            .entrySet()
+            .stream()
+            .map(entry -&gt; new GroupedPerson(entry.getKey(), entry.getValue()))
+            .collect(Collectors.toList());
+    }
+
+    static class Person {
+        public final String name;
+
+        public Person(String name) {
+            super();
+            this.name = name;
+        }
+
+    }
+
+    static class GroupedPerson {
+
+        public final String name;
+        public final List&lt;Person&gt; person;
+
+        public GroupedPerson(String name, List&lt;Person&gt; person) {
+            this.name = name;
+            this.person = person;
+        }
+
+    }
+
+}
+</code></pre>
+",0,48693460,<java-8><java-stream><collectors>,"<p>I have a list of <code>Persons</code> which have some duplicate names.</p>
+
+<pre><code>class Person {
+  String name;
+}
+</code></pre>
+
+<p>I want to convert it to the list of <code>GroupedPersons</code> which contain the common name and the list of all Persons who have that name.</p>
+
+<pre><code>class GroupedPerson {
+  String name;
+  List&lt;A&gt; as;
+}
+</code></pre>
+
+<p>Is it possible to do this with one collector and without any intermediate mapping or extra classes?</p>
+",3,48693460,
+"<p>if you modify your <code>GroupedPerson</code> model to be something along the lines of:</p>
+
+<pre><code>public class GroupedPerson {
+    private String name;
+    private List&lt;Person&gt; people;
+
+    public GroupedPerson(String name) {
+        this.name = name;
+        people = new ArrayList&lt;&gt;();
+    }
+
+    public void addPeople(List&lt;Person&gt; people) {
+        this.people.addAll(people);
+    }
+
+    public void addPerson(Person person){
+           people.add(person);
+    }
+
+    public List&lt;Person&gt; getPeople(){
+        return Collections.unmodifiableList(people);
+    }
+
+    public String getName() {
+        return name;
+    }    
+}
+</code></pre>
+
+<p>Then you can have a <code>Collection</code> of <code>GroupedPerson</code> objects with the names and all the corresponding people with that specific name like this:</p>
+
+<pre><code>Collection&lt;GroupedPerson&gt; resultSet = peopleList
+                .stream()
+                .collect(Collectors.toMap(Person::getName,
+                        p -&gt; {
+                            GroupedPerson groupedPerson = new GroupedPerson(p.getName());
+                            groupedPerson.addPerson(p);
+                            return groupedPerson;
+                        },
+                        (p, p1) -&gt; {
+                            p.addPeople(p1.getPeople());
+                            return p;
+                        }
+                )).values();
+</code></pre>
+
+<p>if for some reason you don't want the receiver type to be <code>Collection&lt;T&gt;</code> then you can convert to a specific collection type if deemed appropriate by simply doing.</p>
+
+<pre><code>List&lt;GroupedPerson&gt; result = new ArrayList&lt;&gt;(resultSet);
+</code></pre>
+",0,48693460,<java-8><java-stream><collectors>,"<p>I have a list of <code>Persons</code> which have some duplicate names.</p>
+
+<pre><code>class Person {
+  String name;
+}
+</code></pre>
+
+<p>I want to convert it to the list of <code>GroupedPersons</code> which contain the common name and the list of all Persons who have that name.</p>
+
+<pre><code>class GroupedPerson {
+  String name;
+  List&lt;A&gt; as;
+}
+</code></pre>
+
+<p>Is it possible to do this with one collector and without any intermediate mapping or extra classes?</p>
+",3,48693460,
+"<p>Lookups are generally pretty fragile (and I don't think they're really intended to be robust); as noted in the links from the other answer they don't appear to support pseudoclasses. </p>
+
+<p>You can of course just use CSS for this:</p>
+
+<pre><code>import javafx.application.Application;
+import javafx.scene.Scene;
+import javafx.scene.control.TextArea;
+import javafx.scene.layout.StackPane;
+import javafx.stage.Stage;
+
+public class Main extends Application { 
+    public static void main(String[] args) {
+        launch(args);
+    }   
+    @Override
+    public void start(Stage primaryStage) {
+
+        TextArea textArea = new TextArea();
+        int lineCount = 100;
+        int wordCount = 70;
+        StringBuilder sb = new StringBuilder();
+
+        for (int lineNbr = 0; lineNbr &lt; lineCount; lineNbr++) {
+            for (int wordNbr = 0; wordNbr &lt; wordCount; wordNbr++) {
+                sb.append(""Sample"");
+            }
+            sb.append(System.getProperty(""line.separator""));
+        }
+
+        textArea.setText(sb.toString());
+
+        StackPane root = new StackPane();
+        root.getChildren().add(textArea);
+
+        Scene scene = new Scene(root, 300, 250) ;
+
+        scene.getStylesheets().add(""style.css"");
+
+        primaryStage.setScene(scene);
+        primaryStage.show();
+
+    }
+}
+</code></pre>
+
+<p>with the following in <code>style.css</code>:</p>
+
+<pre class=""lang-css prettyprint-override""><code>.scroll-pane .scroll-bar:horizontal {
+    -fx-pref-height: 50 ;
+}
+.scroll-pane .scroll-bar:vertical {
+    -fx-pref-width: 50 ;
+}
+</code></pre>
+
+<p><a href=""https://i.stack.imgur.com/8b5Oc.png"" rel=""nofollow noreferrer""><img src=""https://i.stack.imgur.com/8b5Oc.png"" alt=""enter image description here""></a></p>
+
+<p>This approach, of course, is far more convenient if you have multiple scroll panes in your application and want them all to have the same style of scroll bars.</p>
+",0,48692603,<javafx>,"<p>Unpleasantly surprised by TextArea CSS font sizes having wacky effects on the sizes of the scroll bars, I'm trying to get control of the sizes myself. Please refer to the following SSCCE. I can easily control the vertical scroll bar, but the horizontal bar is simply ignoring the sizes I'm setting. Am I expecting something unreasonable here, or is this (yet another) bug in JavaFX? Thanks!</p>
+
+<p><a href=""https://i.stack.imgur.com/g7lBW.png"" rel=""nofollow noreferrer""><img src=""https://i.stack.imgur.com/g7lBW.png"" alt=""enter image description here""></a></p>
+
+<pre><code>public class Main extends Application { 
+    public static void main(String[] args) {
+        launch(args);
+    }   
+    @Override
+    public void start(Stage primaryStage) {
+
+        TextArea textArea = new TextArea();
+        int lineCount = 100;
+        int wordCount = 70;
+        StringBuilder sb = new StringBuilder();
+
+        for (int lineNbr = 0; lineNbr &lt; lineCount; lineNbr++) {
+            for (int wordNbr = 0; wordNbr &lt; wordCount; wordNbr++) {
+                sb.append(""Sample"");
+            }
+            sb.append(System.getProperty(""line.separator""));
+        }
+
+        textArea.setText(sb.toString());
+
+        StackPane root = new StackPane();
+        root.getChildren().add(textArea);
+
+        primaryStage.setScene(new Scene(root, 300, 250));
+        primaryStage.show();
+
+        double prefSize = 50;
+        ScrollBar vertScrollBar = (ScrollBar)textArea.lookup("".scroll-bar:vertical"");
+        ScrollBar horizScrollBar = (ScrollBar)textArea.lookup("".scroll-bar:horizontal"");
+
+        vertScrollBar.setPrefWidth(prefSize); // This works great!
+
+        horizScrollBar.setPrefHeight(prefSize); // This doesn't do anything!
+        horizScrollBar.setMinHeight(prefSize); // Nor does this
+        horizScrollBar.setPrefWidth(prefSize); // Nor this
+        horizScrollBar.setMinWidth(prefSize); // Nor this
+
+    }
+}
+</code></pre>
+",2,48692603,
+"<pre><code>ScrollBar vertScrollBar = (ScrollBar) textArea.lookup("".scroll-bar:vertical"");
+ScrollBar horizScrollBar = (ScrollBar) textArea.lookup("".scroll-bar:horizontal"");
+System.out.println(vertScrollBar + "" "" + horizScrollBar);
+</code></pre>
+
+<blockquote>
+  <p>ScrollBar@35ef2d94[styleClass=scroll-bar]
+  ScrollBar@35ef2d94[styleClass=scroll-bar]</p>
+</blockquote>
+
+<p>Same object (vertical ScrollBar).</p>
+
+<pre><code>    ScrollPane sPane = (ScrollPane)textArea.getChildrenUnmodifiable().get(0);
+    ScrollBar horizScrollBar = (ScrollBar)sPane.getChildrenUnmodifiable().get(2);
+    horizScrollBar.setPrefHeight(prefSize); // This does something!
+</code></pre>
+
+<p><img src=""https://i.stack.imgur.com/9v6TH.png"" alt=""Image""></p>
+
+<p><strong>Update</strong>: Better way to receive the two ScrollBars.</p>
+
+<pre><code>ScrollBar[] bars = new ScrollBar[2];
+textArea.lookupAll("".scroll-bar"").toArray(bars);
+bars[0].setPrefWidth(prefSize);
+bars[1].setPrefHeight(prefSize);
+</code></pre>
+
+<p><strong>Edit</strong>: Explanation for similar problem with lookupAll(...) and pseudo classes <a href=""https://stackoverflow.com/questions/45207442/using-queries-containing-pseudo-classes-in-javafx"">here</a> and <a href=""https://bugs.java.com/bugdatabase/view_bug.do?bug_id=JDK-8185831"" rel=""nofollow noreferrer"">here</a>.</p>
+",1,48692603,<javafx>,"<p>Unpleasantly surprised by TextArea CSS font sizes having wacky effects on the sizes of the scroll bars, I'm trying to get control of the sizes myself. Please refer to the following SSCCE. I can easily control the vertical scroll bar, but the horizontal bar is simply ignoring the sizes I'm setting. Am I expecting something unreasonable here, or is this (yet another) bug in JavaFX? Thanks!</p>
+
+<p><a href=""https://i.stack.imgur.com/g7lBW.png"" rel=""nofollow noreferrer""><img src=""https://i.stack.imgur.com/g7lBW.png"" alt=""enter image description here""></a></p>
+
+<pre><code>public class Main extends Application { 
+    public static void main(String[] args) {
+        launch(args);
+    }   
+    @Override
+    public void start(Stage primaryStage) {
+
+        TextArea textArea = new TextArea();
+        int lineCount = 100;
+        int wordCount = 70;
+        StringBuilder sb = new StringBuilder();
+
+        for (int lineNbr = 0; lineNbr &lt; lineCount; lineNbr++) {
+            for (int wordNbr = 0; wordNbr &lt; wordCount; wordNbr++) {
+                sb.append(""Sample"");
+            }
+            sb.append(System.getProperty(""line.separator""));
+        }
+
+        textArea.setText(sb.toString());
+
+        StackPane root = new StackPane();
+        root.getChildren().add(textArea);
+
+        primaryStage.setScene(new Scene(root, 300, 250));
+        primaryStage.show();
+
+        double prefSize = 50;
+        ScrollBar vertScrollBar = (ScrollBar)textArea.lookup("".scroll-bar:vertical"");
+        ScrollBar horizScrollBar = (ScrollBar)textArea.lookup("".scroll-bar:horizontal"");
+
+        vertScrollBar.setPrefWidth(prefSize); // This works great!
+
+        horizScrollBar.setPrefHeight(prefSize); // This doesn't do anything!
+        horizScrollBar.setMinHeight(prefSize); // Nor does this
+        horizScrollBar.setPrefWidth(prefSize); // Nor this
+        horizScrollBar.setMinWidth(prefSize); // Nor this
+
+    }
+}
+</code></pre>
+",2,48692603,
+"<p>In two steps...</p>
+
+<pre><code>List&lt;String&gt; all = AMap.values()
+                       .stream()
+                       .flatMap(Collection::stream)
+                       .collect(Collectors.toList());
+
+
+Map&lt;String, Long&gt; result = CMap.entrySet().stream()
+            .collect(Collectors.groupingBy(
+                    Entry::getValue,
+                    Collectors.summingLong(
+                            x -&gt; all.stream().filter(y -&gt; y.equals(x.getKey())).count())));
+
+    System.out.println(result); // {C1=4, C2=1}
+</code></pre>
+",2,48687701,<java-8><java-stream>,"<p>How can we use java 8 streams api to get expected output here  </p>
+
+<p>A1 has B1, B2<br>
+A2 has B1, B2, B3</p>
+
+<p>B1, B2 belong to C1<br>
+B3 belong to C2</p>
+
+<p>So, for C1, count should be 4 as B1, B2 appears 4 times<br>
+Likewise count for C2 will be 1 as B3 appears 1 time</p>
+
+<pre><code>        List&lt;String&gt; A= new ArrayList&lt;&gt;();
+        A.add(""A1"");
+        A.add(""A2"");
+
+        Map&lt;String, List&lt;String&gt;&gt; AMap = new HashMap&lt;&gt;();
+        AMap.put(""A1"", Arrays.asList(""B1"", ""B2""));
+        AMap.put(""A2"", Arrays.asList(""B1"", ""B2"", ""B3""));
+
+        Map&lt;String, String&gt; BMap = new HashMap&lt;&gt;();
+        CMap.put(""B1"", ""C1"");
+        CMap.put(""B2"", ""C1"");
+        CMap.put(""B3"", ""C2"");
+</code></pre>
+
+<p>Expected output </p>
+
+<pre><code>        C1 : 4 , C2 : 1
+</code></pre>
+",2,48687701,48702200
+"<p>For each key in the A list, I would fetch each B key which would fetch each C value from the CMap. Then flatmap the stream, group by identity and count the values.</p>
+
+<pre><code>import static java.util.Collections.emptyList;
+import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.counting;
+import static java.util.stream.Collectors.groupingBy;
+
+...
+
+Map&lt;String, Long&gt; res = A.stream()
+         .flatMap(a -&gt; AMap.getOrDefault(a, emptyList()).stream().map(BMap::get))
+         .collect(groupingBy(identity(), counting()));
+</code></pre>
+",5,48687701,<java-8><java-stream>,"<p>How can we use java 8 streams api to get expected output here  </p>
+
+<p>A1 has B1, B2<br>
+A2 has B1, B2, B3</p>
+
+<p>B1, B2 belong to C1<br>
+B3 belong to C2</p>
+
+<p>So, for C1, count should be 4 as B1, B2 appears 4 times<br>
+Likewise count for C2 will be 1 as B3 appears 1 time</p>
+
+<pre><code>        List&lt;String&gt; A= new ArrayList&lt;&gt;();
+        A.add(""A1"");
+        A.add(""A2"");
+
+        Map&lt;String, List&lt;String&gt;&gt; AMap = new HashMap&lt;&gt;();
+        AMap.put(""A1"", Arrays.asList(""B1"", ""B2""));
+        AMap.put(""A2"", Arrays.asList(""B1"", ""B2"", ""B3""));
+
+        Map&lt;String, String&gt; BMap = new HashMap&lt;&gt;();
+        CMap.put(""B1"", ""C1"");
+        CMap.put(""B2"", ""C1"");
+        CMap.put(""B3"", ""C2"");
+</code></pre>
+
+<p>Expected output </p>
+
+<pre><code>        C1 : 4 , C2 : 1
+</code></pre>
+",2,48687701,48702200
+"<p>To format number as you specified, you may try this:</p>
+
+<pre><code>// Eg: format ""123123123"" as ""123,123,123""
+if (newValue.matches(""\\d*"")) {
+    DecimalFormat formatter = new DecimalFormat(""#,###"");
+    String newValueStr = formatter.format(Double.parseDouble(newValue));
+
+    txtPrice.setText(newValueStr);
+}
+</code></pre>
+
+<p>Hope this help, good luck!</p>
+",2,48678844,<java><javafx><textfield>,"<p>I do get the price from the user but I want to filter the digits and puts, in each 3 digits like 123,123,123.</p>
+
+<pre><code>txtPrice.textProperty().addListener((observable, oldValue, newValue) -&gt; {
+   if (!newValue.matches(""\\d*"")){
+       txtPrice.setText(newValue.replaceAll(""[^\\d]"",""""));
+   }
+});
+</code></pre>
+",2,48678844,
+"<p>Try this:</p>
+
+<pre><code>textFieldUsername.setOnKeyTyped(event -&gt; {
+    String typedCharacter = event.getCharacter();
+    event.consume();
+
+    if (typedCharacter.matches(""\\d*"")) {
+        String currentText = textFieldUsername.getText().replaceAll(""\\."", """").replace("","", """");
+        long longVal = Long.parseLong(currentText.concat(typedCharacter));
+        textFieldUsername.setText(new DecimalFormat(""#,##0"").format(longVal));
+    }
+});
+</code></pre>
+",0,48678844,<java><javafx><textfield>,"<p>I do get the price from the user but I want to filter the digits and puts, in each 3 digits like 123,123,123.</p>
+
+<pre><code>txtPrice.textProperty().addListener((observable, oldValue, newValue) -&gt; {
+   if (!newValue.matches(""\\d*"")){
+       txtPrice.setText(newValue.replaceAll(""[^\\d]"",""""));
+   }
+});
+</code></pre>
+",2,48678844,
+"<p>You could use helper stream initialization class that handles the process of preparing stream and catch any exception there. Consider following example:</p>
+
+<pre><code>import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+public class SafeInitializationStreamExample {
+
+    public static void main(String[] args) {
+        int sum = SafeInitializationStream.from(() -&gt; Stream.of(1,2,3,4))
+                .onInitializationError(t -&gt; System.out.println(t.getMessage()))
+                .mapToInt(it -&gt; it)
+                .sum();
+
+        System.out.println(sum);
+
+        List&lt;Object&gt; list = SafeInitializationStream.from(() -&gt; parse(""/tmp/test.log""))
+                .onInitializationError(t -&gt; System.out.println(t.getMessage()))
+                .map(it -&gt; it.toString())
+                .collect(Collectors.toList());
+
+        System.out.println(list);
+    }
+
+    private static &lt;T&gt; Stream&lt;T&gt; parse(String filename) {
+        throw new RuntimeException(""File does not exist!"");
+    }
+
+    static class SafeInitializationStream&lt;T&gt; {
+        private final Supplier&lt;Stream&lt;T&gt;&gt; streamSupplier;
+
+        private SafeInitializationStream(Supplier&lt;Stream&lt;T&gt;&gt; streamSupplier) {
+            this.streamSupplier = streamSupplier;
+        }
+
+        public static &lt;T&gt; SafeInitializationStream&lt;T&gt; from(Supplier&lt;Stream&lt;T&gt;&gt; streamSupplier) {
+            return new SafeInitializationStream&lt;&gt;(streamSupplier);
+        }
+
+        public Stream&lt;T&gt; onInitializationError(Consumer&lt;Throwable&gt; onError) {
+            try {
+                return streamSupplier.get();
+            } catch (Exception e) {
+                onError.accept(e);
+            }
+            return Stream.empty();
+        }
+    }
+}
+</code></pre>
+
+<p>In this example we introduce <code>SafeInitializationStream</code> class which expects a <code>Supplier&lt;Stream&lt;T&gt;&gt;</code>:</p>
+
+<pre><code>SafeInitializationStream.from(() -&gt; Stream.of(1,2,3,4))
+</code></pre>
+
+<p>Using <code>Supplier&lt;Stream&lt;T&gt;&gt;</code> in this case makes stream initialization lazy - until we call <code>Supplier.get()</code> the body of this supplier is not executed. Now, when we call:</p>
+
+<pre><code>.onInitializationError(t -&gt; System.out.println(t.getMessage()))
+</code></pre>
+
+<p>we execute suppliers body, catch any exception that may be thrown and handle this exception by passing <code>Throwable</code> to <code>Consumer&lt;Throwable&gt;</code> that was passed as a parameter to <code>onInitializationError</code> method. In case of exception <code>Stream.empty()</code> is returned (so you can safely apply all other transformations in chain. When there is no exception, <code>Stream&lt;T&gt;</code> provided by supplier is returned.</p>
+
+<p>If you run following example you will get in console:</p>
+
+<pre><code>10
+File does not exist!
+[]
+</code></pre>
+
+<p>The first stream was consumed without any errors and the <code>sum</code> was returned correctly.</p>
+
+<p>The second stream thrown exception during initialization, we have caught it and printed to the console and finally empty list was returned after consuming the stream.</p>
+
+<p>Of course you can use <code>Function&lt;Throwable, Stream&lt;T&gt;&gt;</code> in <code>onInitializationError</code> method if you want to specify what <code>Stream&lt;T&gt;</code> is returned in case of an exception. In this case we assume that <code>Stream.empty()</code> is always returned in this case. Hope it helps.</p>
+",3,48676897,<java><java-8><java-stream>,"<p>Let's say I have the following method I want to refactor</p>
+
+<pre><code>protected Stream&lt;T&gt; parseFile(File file, Consumer&lt;File&gt; cleanup) {
+  try {
+    return parser.parse(file); // returns a Stream&lt;T&gt;
+  } catch (XmlParseException e) { // child of RuntimeException
+    throw new CustomRuntimeException(e);
+  } finally {
+    if (file != null) {
+      cleanup.accept(file);
+    }
+  }
+
+  throw new IllegalStateException(""Should not happen"");
+}
+</code></pre>
+
+<p>This method's purpose is to act as a proxy attaching error handling on the stream rethrowing in a wrapping exception <code>CustomRuntimeException</code>. So when we consume it later in the flow, I don't have to handle those exceptions everywhere but only <code>CustomRuntimeException</code>.</p>
+
+<p>Upstream, I used that method as follow</p>
+
+<pre><code>try {
+  Stream&lt;T&gt; stream = parseFile(someFile);
+  stream.map(t -&gt; ...);
+catch (CustomRuntimeException e) {
+  // do some stuff
+}
+</code></pre>
+
+<p>And here's what the parser.parse method looks like</p>
+
+<pre><code>public Stream&lt;T&gt; parse() {
+  // ValueIterator&lt;T&gt; implements Iterator&lt;T&gt;, AutoCloseable
+  XmlRootParser.ValueIterator&lt;T&gt; valueIterator = new XmlRootParser.ValueIterator(this.nodeConverter, this.reader, this.nodeLocalName, this.nodeName);
+  Stream&lt;T&gt; stream = StreamSupport.stream(Spliterators.spliteratorUnknownSize(valueIterator, 1040), false);
+  stream.onClose(valueIterator::close);
+  return stream;
+}
+</code></pre>
+
+<p>The exceptions I want to handle will be thrown by the ValueIterator.hasNext method. Which means they won't be thrown at Stream creation but only at Stream consumption (calling foreach/map/count/collect/... on the stream).</p>
+
+<p>How do I attach error handling on my stream in method <code>parseFile</code> nicely without having to consume the stream? Is it possible?</p>
+
+<p>Obviously this code will work only if the <code>parser.parse</code> method consume its stream before returning it. Which is against using streams.</p>
+",2,48676897,
