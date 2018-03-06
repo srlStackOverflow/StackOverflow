@@ -15,7 +15,7 @@ import org.apache.commons.csv.CSVRecord;
 public class CsvFileReader {
     
     //CSV file header
-    private static final String [] FILE_HEADER_MAPPING = {"Answeres", "Score", "Post Link", "Question Tags", "Body", "AnswerCount", "Id", "Dup_IDs"};
+    private static final String [] FILE_HEADER_MAPPING = {"Answeres", "Score", "Post Link", "Question Tags", "Body", "AnswerCount", "Id", "Dup_IDs", "Title"};
     
     //Student attributes
     private static final String answer = "Answeres";
@@ -26,6 +26,7 @@ public class CsvFileReader {
     private static final String answer_Count = "AnswerCount"; 
     private static final String question_Id = "Id";
     private static final String duplicate_Ids = "Dup_IDs";
+    private static final String question_title = "Title";
     
     // Read csv file and return its contenet in an array list
     // define a row, a class to store row content from the csv file 
@@ -60,7 +61,7 @@ public class CsvFileReader {
                 //Create a new student object and fill his data
                 Row row = new Row(record.get(answer), Integer.parseInt(record.get(score)),
                         Long.parseLong(record.get(answer_Id)), record.get(question_Tags), 
-                                     record.get(Question_Body),Integer.parseInt(record.get(answer_Count)),Long.parseLong(record.get(question_Id)),record.get(duplicate_Ids) );
+                                     record.get(Question_Body),Integer.parseInt(record.get(answer_Count)),Long.parseLong(record.get(question_Id)),record.get(duplicate_Ids), record.get(question_title) );
                 rows.add(row);  
             }
 
