@@ -15,17 +15,17 @@ import org.apache.commons.csv.CSVRecord;
 public class CsvFileReader {
     
     //CSV file header
-    private static final String [] FILE_HEADER_MAPPING = {"Answeres", "Score", "Post Link", "Question Tags", "Body", "AnswerCount", "Id", "Dup_IDs", "Title"};
-    
+    //private static final String [] FILE_HEADER_MAPPING = {"Answeres", "Score", "Post Link", "Question Tags", "Body", "AnswerCount", "Id", "Dup_IDs", "Title"};
+    private static final String [] FILE_HEADER_MAPPING = {"Answeres", "Post Link", "Id", "Title"};
     //Student attributes
     private static final String answer = "Answeres";
-    private static final String score = "Score";
+    //private static final String score = "Score";
     private static final String answer_Id = "Post Link";
-    private static final String question_Tags = "Question Tags"; 
-    private static final String Question_Body = "Body";
-    private static final String answer_Count = "AnswerCount"; 
+    //private static final String question_Tags = "Question Tags";
+    //private static final String Question_Body = "Body";
+    //private static final String answer_Count = "AnswerCount";
     private static final String question_Id = "Id";
-    private static final String duplicate_Ids = "Dup_IDs";
+    //private static final String duplicate_Ids = "Dup_IDs";
     private static final String question_title = "Title";
     
     // Read csv file and return its contenet in an array list
@@ -59,10 +59,18 @@ public class CsvFileReader {
             for (int i = 1; i < csvRecords.size(); i++) {
                 CSVRecord record = csvRecords.get(i);
                 //Create a new student object and fill his data
+                /*
                 Row row = new Row(record.get(answer), Integer.parseInt(record.get(score)),
-                        Long.parseLong(record.get(answer_Id)), record.get(question_Tags), 
+                        Long.parseLong(record.get(answer_Id)), record.get(question_Tags),
                                      record.get(Question_Body),Integer.parseInt(record.get(answer_Count)),Long.parseLong(record.get(question_Id)),record.get(duplicate_Ids), record.get(question_title) );
-                rows.add(row);  
+
+                */
+                Row row = new Row(record.get(answer)
+                        ,Integer.parseInt(record.get(answer_Id))
+                        ,Long.parseLong(record.get(question_Id))
+                        ,record.get(question_title) );
+
+                rows.add(row);
             }
 
             System.out.println("Number of record extracted from the CSV file(s): "+ rows.size());
@@ -81,7 +89,6 @@ public class CsvFileReader {
             try {
                 fileReader.close();
                 csvFileParser.close();
-            
             } catch (IOException e) {
                 System.out.println("Error while closing fileReader/csvFileParser !!!");
                 e.printStackTrace();

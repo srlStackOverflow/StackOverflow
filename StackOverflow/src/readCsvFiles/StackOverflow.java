@@ -1,21 +1,28 @@
 package readCsvFiles;
 
-import com.github.javaparser.JavaParser;
-import com.github.javaparser.ast.CompilationUnit;
-import com.jamesmurty.utils.XMLBuilder;
-import javafx.util.Pair;
-import org.omg.CORBA.Environment;
-
-import javax.swing.*;
-import javax.xml.transform.OutputKeys;
-import java.awt.*;
-import java.lang.reflect.Executable;
 import java.util.*;
 import java.io.*;
-import java.awt.event.*;
 import java.util.List;
 
+class Answer{
+    public Long id;
+    public String body;
 
+    Answer(Long ID, String BODY){
+        id = ID;
+        body = BODY;
+    }
+}
+
+class Cluster{
+    public String title;
+    public Set<Answer> answer;
+
+    Cluster(String Title){
+        title = Title;
+        answer = new HashSet<>();
+    }
+}
 
 public class StackOverflow{
 	
@@ -24,109 +31,70 @@ public class StackOverflow{
 	public static ArrayList<Row> rowsFromCsvFile = new ArrayList();
 	public static ArrayList<Row> rowsProcessed = new ArrayList();
 
-	public static List<Set<Long>> Clusters = new ArrayList();
-	public static Map<Long, String> answer_body = new HashMap();
-    public static Map<Long, Set<Long>> question_answer = new HashMap();
-    public static Map<Long, String> ID_Question = new HashMap<>();
+	public static Map<Long, Cluster> questions = new HashMap();
 
-    public static int AnwserLength = 20;
-    public static int index = 0;
+    public static int AnwserLength = 7;
+    public static List<String> Files = new ArrayList();
 
 	public static void main(String[] args) {
+        LoadFiles("./Query/C_2008-2017/");
+        //LoadFiles("./Query/C#_2008-2017/");
+        //LoadFiles("./Query/Java_2008-2017/");
+        //LoadFiles("./Query/Python_2008-2017/");
 
-	    //Read CSV files
-		String fileName = "SO_2010-2017.csv";
-        //String fileName = "test.csv";
-		rowsFromCsvFile=CsvFileReader.readCsvFile(fileName);
-		rowsProcessed=CodeParser.convertToSource(rowsFromCsvFile);
+        int total_download = 0;
+        int filtered_answer = 0;
 
-		// iterate all records
+        for(String file : Files) {
 
-		for (Row row:rowsProcessed) {
-            // 0. Answer Filter
-            if(!Answer_Filter(row.answersBody))
-                continue;
+            //Read CSV files
+            String fileName = file;
+            rowsFromCsvFile = CsvFileReader.readCsvFile(fileName);
+            rowsProcessed = CodeParser.convertToSource(rowsFromCsvFile);
 
-            // 1. Store answers to List
-            FetchAnswer(row);
+            // iterate all records
 
-            // 2. Cluster Locator
-            Cluster_Locator(row.questionId, row.duplicate_Ids);
-		}
+            for (Row row : rowsProcessed) {
+                total_download++;
 
-		// 3. Solution with 2 or more answers only
-        AnswerCounterFilter(2);
+                // 0. Answer Filter
+                if (!Answer_Filter(row.answersBody))
+                    continue;
 
+                // 1. Store answers to Cluster
+                if (!questions.containsKey(row.questionId))
+                    questions.put(row.questionId,new Cluster(row.question_title));
+
+                questions.get(row.questionId).answer.add(new Answer(row.answerId,row.answersBody));
+                filtered_answer++;
+            }
+        }
+
+        // 3. Solution with 2 or more answers only
+        filtered_answer = AnswerCounterFilter(2,filtered_answer);
         // 4. Storage / Write result
-        StoreResults("XML");
+        StoreResults("Class","./Results/CFunction/","c");
 
-		// 5. Create GUI
-        //viewPane();
+        System.out.println("Total Questions: " + total_download);
+        System.out.println("Filtered Questions: " + filtered_answer);
+        System.out.println("Cluster Count: " + questions.size());
 	}
 
 	private static boolean Answer_Filter(String answer){
 	    return answer.split("\\r?\\n").length >= AnwserLength;
     }
 
-    private static void Cluster_Locator(long qID, String relateIDs){
-        if (relateIDs.isEmpty()) {
-            boolean found = false;
-            for(Set<Long> cluster : Clusters){
-                if(cluster.contains((qID))){
-                    found = true;
-                    break;
-                }
-            }
-
-            if(!found) {
-                Set<Long> tmp = new HashSet<>();
-                tmp.add(qID);
-                Clusters.add(tmp);
-            }
-
-        }else{
-            String[] ID = relateIDs.split(",");
-            Long[] IDs = new Long[ID.length];
-            for (int i=0;i<ID.length;i++){
-                IDs[i] = Long.parseLong(ID[i].trim());
-            }
-
-            for(Set<Long> cluster : Clusters){
-                if(cluster.contains((qID))) {
-                    cluster.addAll(new LinkedList(Arrays.asList(IDs)));
-                    return;
-                }
-            }
-
-            Set<Long> tmp = new HashSet<>();
-            tmp.add(qID);
-            boolean found = false;
-            for(int i = 0; i< IDs.length; i++) {
-                Iterator<Set<Long>> iter = Clusters.iterator();
-                while (iter.hasNext()) {
-                    Set<Long> cluster = iter.next();
-                    if (cluster.contains(IDs[i])) {
-                        found = true;
-                        tmp.addAll(cluster);
-                        Clusters.remove(cluster);
-                        break;
-                    }
-                }
-
-                if (!found)
-                    tmp.add(IDs[i]);
-            }
-            Clusters.add(tmp);
-        }
-    }
-
-    private static void StoreResults(String type){
+    private static void StoreResults(String type, String folder, String extension){
 	    if(type.equals("CSV")){
-	        Export2CSV();
+            System.out.println("Under Construction");
         }
 
         if(type.equals("XML")){
 	        ExportXML();
+        }
+
+        if(type.equals("Class")){
+            ExportClass(folder,extension);
         }
 
         if(type.equals("SQL")){
@@ -134,31 +102,8 @@ public class StackOverflow{
         }
     }
 
-    private static void Export2CSV(){
-	    if (Clusters.size() == 0){
-	        System.out.println("No Clusters");
-	        return;
-        }
-
-        try {
-            PrintWriter pw = new PrintWriter(new File("out.csv"));
-            StringBuilder sb = new StringBuilder();
-            for(Set<Long> cluster : Clusters){
-                for (Long num : cluster){
-                    sb.append(num);
-                    sb.append(',');
-                }
-                sb.append("\n");
-            }
-
-            pw.write(sb.toString());
-            pw.close();
-        }catch(Exception e){
-	        System.out.println(e.getMessage());
-        }
-    }
-
     private static void ExportXML(){
+	    /*
 	    try {
             XMLBuilder builder = XMLBuilder.create("Clusters");
             for(Set<Long> cluster :Clusters){
@@ -170,7 +115,9 @@ public class StackOverflow{
 
                     if(!question_answer.containsKey(question)) continue;
                     for(Long answer_ID : question_answer.get(question)){
-                        q.element("Answer").cdata(answer_body.get(answer_ID));
+                        q.element("Answer").cdata(answer_body.get(answer_ID).replaceAll("[^\\p{ASCII}]", ""));
+                        //q.cdata("Answer").text(answer_body.get(answer_ID));
+                        //replaceAll("\\r?\\n","\r\n")
                     }
                 }
             }
@@ -180,117 +127,51 @@ public class StackOverflow{
             builder.toWriter(writer,outputProperties);
         }
         catch(Exception e){System.out.println(e.toString());}
-
+        */
     }
 
-    private static String GetAnswers(Long questionID){
-	    String rtv = "";
-        for( Long tmp:question_answer.get(questionID)){
-            rtv += tmp.toString() +",";
+    private static int AnswerCounterFilter(int minimal, int count){
+	    List<Long> found = new ArrayList<>();
+
+	    for (Map.Entry<Long,Cluster> tmp: questions.entrySet()){
+	        if(tmp.getValue().answer.size() < minimal)
+	            found.add(tmp.getKey());
         }
-        return rtv;
+
+        for(Long tmp :found){
+            count -= questions.get(tmp).answer.size();
+	        questions.remove(tmp);
+        }
+
+        return count;
     }
 
-    private static Pair ClusterGetAnswer(Set<Long> cluster){
-	    //System.out.println();
-        String rtv = "";
-	    for(Long tmp : cluster){
-            rtv += GetAnswers(tmp);
-        }
-        return new Pair<String, Set<Long>>(rtv,cluster);
-    }
-
-    private static String AnsersCodeFragment(Pair<String, Set<Long>> pair){
-	    String[] l = pair.getKey().split(",");
-
-	    String rtv = "Questions in Cluster: \n";
-	    for (Long q : pair.getValue()){
-            rtv+=(ID_Question.get(q)+"\n");
-        }
-	    for (String tmp : l){
-            if(!Answer_Filter(answer_body.get(Long.parseLong(tmp))))
-                continue;
-            rtv += "\n======================Answer "+tmp+"=============================\n";
-            try {
-                //CompilationUnit cu = JavaParser.parse(answer_body.get(Long.parseLong(tmp)));
-                //rtv += cu.toString();
-                rtv += answer_body.get(Long.parseLong(tmp));
-
-            }
-            catch(Exception e){
-                rtv += "**Filtered by JavaParser";
-            }
-
-        }
-        return rtv;
-    }
-
-    private static void AnswerCounterFilter(int minimal){
-	    List<Set<Long>> found = new ArrayList<>();
-        for(Set<Long> cluster : Clusters){
-            int count = 0;
-            for (Long question : cluster){
-                if(question_answer.containsKey((question)))
-                    count += question_answer.get(question).size();
-            }
-            if(count < minimal){
-                found.add(cluster);
+    private static void LoadFiles(String dir){
+	    File folder = new File(dir);
+	    File[] ListFiles = folder.listFiles();
+	    for(File tmp :ListFiles){
+	        if(tmp.isFile()){
+                Files.add(dir+tmp.getName());
             }
         }
-        Clusters.removeAll(found);
     }
 
-    private static void FetchAnswer(Row row){
-        ID_Question.put(row.questionId,row.question_title);
-        answer_body.put(row.answerId,row.answersBody);
+    private static void ExportClass(String folder, String extension){
+	    try {
+            for (Map.Entry<Long, Cluster> tmp : questions.entrySet()) {
+                for (Answer a : tmp.getValue().answer) {
+                    String file = folder + tmp.getKey().toString() + "_" + a.id.toString() + "." + extension;
+                    String path = file;
+                    File f = new File(path);
+                    f.getParentFile().mkdirs();
+                    f.createNewFile();
 
-        if(question_answer.containsKey(row.questionId)){
-            question_answer.get(row.questionId).add(row.answerId);
-        }else{
-            Set<Long> tmp = new HashSet();
-            tmp.add(row.answerId);
-            question_answer.put(row.questionId,tmp);
-        }
-    }
-
-    private static void viewPane(){
-
-        JFrame f = new JFrame("Cluster View");
-        f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        JTextArea text = new JTextArea(AnsersCodeFragment(ClusterGetAnswer(Clusters.get(index))));
-        JScrollPane scroll = new JScrollPane (text,JScrollPane.VERTICAL_SCROLLBAR_ALWAYS,JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
-
-        text.setLineWrap(true);
-        JButton btn_next = new JButton("Next");
-        JButton btn_last = new JButton("Last");
-        btn_next.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (index+1 == Clusters.size()){return;}
-                index += 1;
-                text.setText("");
-                text.append(AnsersCodeFragment(ClusterGetAnswer(Clusters.get(index))));
+                    PrintWriter writer = new PrintWriter(file, "UTF-8");
+                    writer.println(a.body);
+                    writer.close();
+                }
             }
-        });
+        }catch(Exception e){System.out.println(e.getMessage());};
 
-        btn_last.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                if (index == 0){return;}
-                index -= 1;
-                text.setText("");
-                text.append(AnsersCodeFragment(ClusterGetAnswer(Clusters.get(index))));
-            }
-        });
-
-
-        //f.add(text, BorderLayout.CENTER);
-        f.add(scroll,BorderLayout.CENTER);
-        f.add(btn_last, BorderLayout.LINE_START);
-        f.add(btn_next, BorderLayout.LINE_END);
-
-        f.setSize(800, 500);
-        f.setVisible(true);
     }
-
 }
